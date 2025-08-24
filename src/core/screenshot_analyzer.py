@@ -1,10 +1,10 @@
 """
 Screenshot Analyzer - Digital Investigation Tool
-Enhanced Version: Google Cloud Vision AI + SQLite + FastAPI
+Local Version: Tesseract OCR + OpenCV + SQLite + FastAPI + BLIP
 
-This module processes screenshot images using Google Cloud Vision API for OCR, 
-label detection, and SafeSearch. It categorizes images into chats, transactions,
-threats, adult content, or uncategorized, and stores the results in a SQLite database.
+This module processes screenshot images using local tools for OCR, 
+label detection, and content analysis. It categorizes images into chats, transactions,
+threats, or uncategorized, and stores the results in a SQLite database.
 """
 
 import os
@@ -25,9 +25,9 @@ from dataclasses import dataclass
 from PIL import Image as PILImage
 import pytesseract
 import spacy
-from google.cloud import vision
-from google.oauth2 import service_account
 from sqlalchemy import create_engine, Column, String, Integer, Float, DateTime, Boolean, ForeignKey, Text, JSON
+from transformers import BlipProcessor, BlipForConditionalGeneration
+import torch
 from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 
 # Base class for SQLAlchemy models
@@ -46,7 +46,6 @@ class Image(Base):
     file_hash = Column(String(64), nullable=False, index=True)
     detected_text = Column(Text, nullable=True)
     category = Column(String(50), nullable=False, default='uncategorized', index=True)
-    safe_search = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     tags = relationship("ImageTag", back_populates="image")
     
@@ -80,33 +79,30 @@ class Category(str, Enum):
 class TagType(str, Enum):
     ENTITY = "entity"
     LABEL = "label"
-    SAFESEARCH = "safesearch"
     KEYWORD = "keyword"
+    BLIP = "blip"
 
 
 class ScreenshotAnalyzer:
     """Class for analyzing screenshot images for digital investigations."""
     
-    def __init__(self, db_path='screenshot_db.sqlite', credentials_path=None):
+    def __init__(self, db_path='screenshot_db.sqlite'):
         """
         Initialize the Screenshot Analyzer.
         
         Args:
             db_path (str): Path to SQLite database file.
-            credentials_path (str): Path to Google Cloud Vision API credentials JSON.
         """
         # Initialize database
         self.engine = create_engine(f'sqlite:///{db_path}')
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
         
-        # Initialize Google Cloud Vision client
-        if credentials_path and os.path.exists(credentials_path):
-            credentials = service_account.Credentials.from_service_account_file(credentials_path)
-            self.vision_client = vision.ImageAnnotatorClient(credentials=credentials)
-        else:
-            # Use default credentials (environment variable GOOGLE_APPLICATION_CREDENTIALS)
-            self.vision_client = vision.ImageAnnotatorClient()
+        # Initialize BLIP model for image captioning
+        print("Loading BLIP model...")
+        self.blip_processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+        self.blip_model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
+        print("BLIP model loaded successfully!")
         
         # Load spaCy NLP model for entity recognition
         try:
@@ -143,7 +139,7 @@ class ScreenshotAnalyzer:
         
     def process_image(self, image_path):
         """
-        Process the input image using Google Cloud Vision API.
+        Process the input image using local tools (Tesseract OCR, BLIP, OpenCV).
         
         Args:
             image_path (str): Path to the image file.
@@ -172,63 +168,60 @@ class ScreenshotAnalyzer:
         image_id = str(uuid.uuid4())
         
         try:
-            # Read image file for Vision API
-            with open(image_path, 'rb') as image_file:
-                content = image_file.read()
+            # Load image with PIL
+            pil_image = PILImage.open(image_path).convert('RGB')
             
-            vision_image = vision.Image(content=content)
-            
-            # Features to extract from the image
-            features = [
-                vision.Feature(type_=vision.Feature.Type.TEXT_DETECTION),
-                vision.Feature(type_=vision.Feature.Type.LABEL_DETECTION, max_results=10),
-                vision.Feature(type_=vision.Feature.Type.SAFE_SEARCH_DETECTION),
-            ]
-            
-            # Call Vision API
-            response = self.vision_client.annotate_image({'image': vision_image, 'features': features})
-            
-            # Extract OCR text
+            # Extract OCR text using Tesseract
             detected_text = ""
-            if response.text_annotations:
-                detected_text = response.text_annotations[0].description
+            try:
+                detected_text = pytesseract.image_to_string(pil_image)
+                detected_text = detected_text.strip()
+            except Exception as e:
+                print(f"OCR failed: {e}")
             
-            # Extract labels
+            # Generate image caption using BLIP
             labels = []
-            for label in response.label_annotations:
-                labels.append({
-                    'name': label.description,
-                    'score': label.score
-                })
+            try:
+                inputs = self.blip_processor(pil_image, return_tensors="pt")
+                with torch.no_grad():
+                    out = self.blip_model.generate(**inputs, max_length=50)
+                caption = self.blip_processor.decode(out[0], skip_special_tokens=True)
+                
+                # Convert caption to labels format
+                caption_words = caption.split()
+                for word in caption_words:
+                    if len(word) > 2:  # Skip short words
+                        labels.append({
+                            'name': word.lower(),
+                            'score': 0.8  # Default confidence for BLIP captions
+                        })
+            except Exception as e:
+                print(f"BLIP captioning failed: {e}")
             
-            # Extract SafeSearch results
-            safe_search = {
-                'adult': vision.SafeSearchAnnotation.Likelihood.Name(response.safe_search_annotation.adult),
-                'violence': vision.SafeSearchAnnotation.Likelihood.Name(response.safe_search_annotation.violence),
-                'racy': vision.SafeSearchAnnotation.Likelihood.Name(response.safe_search_annotation.racy)
-            }
+            # Remove SafeSearch (not available locally) - set to empty
+            safe_search = {}
             
             # Extract entities using spaCy
             entities = self._extract_entities(detected_text)
             
-            # Determine category
+            # Determine category (without safe_search)
             category = self._classify_content(detected_text, labels, safe_search, entities)
             
-            # Combine all tags
+            # Combine all tags (without safe_search)
             all_tags = self._generate_tags(detected_text, labels, entities, category, safe_search)
             
-            # Create DB record
+            # Create DB record (without safe_search)
             db_image = Image(
                 id=image_id,
                 file_path=image_path,
                 file_hash=file_hash,
                 detected_text=detected_text,
                 category=category.value,
-                safe_search=safe_search,
                 created_at=datetime.datetime.utcnow()
             )
             
             # Add tags to DB
+            added_tag_ids = set()  # Track added tags to avoid duplicates
             for tag in all_tags:
                 tag_obj = session.query(Tag).filter_by(name=tag['name']).first()
                 if tag_obj:
@@ -244,13 +237,15 @@ class ScreenshotAnalyzer:
                     session.add(tag_obj)
                     session.flush()  # To get the tag ID
                 
-                # Link tag to image
-                image_tag = ImageTag(
-                    image_id=image_id,
-                    tag_id=tag_obj.id,
-                    confidence=tag.get('confidence')
-                )
-                db_image.tags.append(image_tag)
+                # Link tag to image (avoid duplicates)
+                if tag_obj.id not in added_tag_ids:
+                    image_tag = ImageTag(
+                        image_id=image_id,
+                        tag_id=tag_obj.id,
+                        confidence=tag.get('confidence')
+                    )
+                    db_image.tags.append(image_tag)
+                    added_tag_ids.add(tag_obj.id)
             
             # Save to database
             session.add(db_image)
@@ -265,7 +260,7 @@ class ScreenshotAnalyzer:
                 "labels": [l['name'] for l in labels],
                 "tags": [t['name'] for t in all_tags],
                 "category": category.value,
-                "safe_search": safe_search,
+                "blip_caption": caption if 'caption' in locals() else "",
                 "timestamp": datetime.datetime.utcnow().isoformat()
             }
             
@@ -349,9 +344,7 @@ class ScreenshotAnalyzer:
     
     def _classify_content(self, text, labels, safe_search, entities):
         """Classify content into predefined categories."""
-        # Check for adult content first based on SafeSearch
-        if safe_search['adult'] in ['LIKELY', 'VERY_LIKELY'] or safe_search['racy'] in ['LIKELY', 'VERY_LIKELY']:
-            return Category.ADULT
+        # Note: SafeSearch is no longer available locally, skip adult content detection
         
         # Check for threats
         for pattern in self.threat_patterns:
@@ -404,22 +397,15 @@ class ScreenshotAnalyzer:
                 'confidence': entity.get('confidence')
             })
         
-        # Add labels as tags
+        # Add labels as tags (from BLIP)
         for label in labels:
             tags.append({
-                'name': f"{TagType.LABEL.value}.{label['name'].lower()}",
-                'type': TagType.LABEL,
+                'name': f"{TagType.BLIP.value}.{label['name'].lower()}",
+                'type': TagType.BLIP,
                 'confidence': label.get('score')
             })
         
-        # Add SafeSearch flags as tags
-        for key, value in safe_search.items():
-            if value in ['POSSIBLE', 'LIKELY', 'VERY_LIKELY']:
-                tags.append({
-                    'name': f"{TagType.SAFESEARCH.value}.{key}.{value.lower()}",
-                    'type': TagType.SAFESEARCH,
-                    'confidence': None
-                })
+        # Note: SafeSearch is no longer available locally - skip this section
         
         # Extract keywords from text
         if text:
@@ -478,7 +464,6 @@ class ScreenshotAnalyzer:
                 "labels": labels,
                 "tags": all_tags,
                 "category": db_image.category,
-                "safe_search": db_image.safe_search,
                 "timestamp": db_image.created_at.isoformat()
             }
         finally:
@@ -782,14 +767,14 @@ def main():
         if len(sys.argv) > 3:
             credentials_path = sys.argv[3]
         global analyzer
-        analyzer = ScreenshotAnalyzer(credentials_path=credentials_path)
+        analyzer = ScreenshotAnalyzer()
         print(f"Starting API server on port {port}...")
         uvicorn.run("screenshot_analyzer:app", host="0.0.0.0", port=port, reload=False)
     else:
         print("[DEBUG] Running in local command-line mode. No server/API involved.")
         image_path = sys.argv[1]
         credentials_path = sys.argv[2] if len(sys.argv) > 2 else None
-        analyzer = ScreenshotAnalyzer(credentials_path=credentials_path)
+        analyzer = ScreenshotAnalyzer()
         result = analyzer.process_image(image_path)
         print(json.dumps(result, indent=2))
 

@@ -26,7 +26,7 @@ class ScreenshotAnalyzerGUI:
         self.root.title("Screenshot Analyzer for Digital Investigations")
         self.root.geometry("1000x700")
         
-        self.analyzer = ScreenshotAnalyzer(credentials_path=credentials_path)
+        self.analyzer = ScreenshotAnalyzer()
         self.current_image_path = None
         self.search_results = []
         self.current_result_index = 0
