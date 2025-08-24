@@ -22,14 +22,13 @@ from typing import List, Dict, Any, Optional, Tuple
 from enum import Enum
 from dataclasses import dataclass
 
-from PIL import Image
+from PIL import Image as PILImage
 import pytesseract
 import spacy
 from google.cloud import vision
 from google.oauth2 import service_account
 from sqlalchemy import create_engine, Column, String, Integer, Float, DateTime, Boolean, ForeignKey, Text, JSON
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 
 # Base class for SQLAlchemy models
 Base = declarative_base()
@@ -154,7 +153,7 @@ class ScreenshotAnalyzer:
         """
         # Check if the file exists and is an image
         if not os.path.exists(image_path):
-            return self._create_error_response("File not found")
+            return self._create_error_response(f"File does not exist: {image_path}")
             
         if not self._is_valid_image(image_path):
             return self._create_error_response("Invalid image file")
@@ -496,10 +495,11 @@ class ScreenshotAnalyzer:
             bool: True if the file is a valid image, False otherwise.
         """
         try:
-            img = Image.open(image_path)
-            img.verify()  # Verify it's an image
+            with PILImage.open(image_path) as img:
+                img.load()  # Try to load the image data
             return True
-        except:
+        except Exception as e:
+            print(f"[DEBUG] Image validation failed: {e}")
             return False
     
     def _create_error_response(self, error_message):
@@ -694,8 +694,8 @@ app = FastAPI(
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-# Initialize analyzer
-analyzer = ScreenshotAnalyzer()
+# Global analyzer variable (initialized in main or server mode)
+analyzer = None
 
 @app.post("/upload", response_model=dict)
 async def upload_image(file: UploadFile = File(...)):
@@ -768,41 +768,29 @@ def main():
     if len(sys.argv) < 2:
         print("Usage: python screenshot_analyzer.py <image_path> [credentials_path]")
         print("  or use: python screenshot_analyzer.py --server [port] [credentials_path]")
+        print("[DEBUG] This is a local command-line run, not a server/API request.")
         sys.exit(1)
-    
     if sys.argv[1] == "--server":
-        # Run as API server
+        print("[DEBUG] Starting FastAPI server mode. Requests will go to the local API server.")
         port = 8000
         credentials_path = None
-        
         if len(sys.argv) > 2:
             try:
                 port = int(sys.argv[2])
             except ValueError:
                 credentials_path = sys.argv[2]
-        
         if len(sys.argv) > 3:
             credentials_path = sys.argv[3]
-        
-        # Initialize analyzer with credentials if provided
         global analyzer
         analyzer = ScreenshotAnalyzer(credentials_path=credentials_path)
-        
-        # Start the server
         print(f"Starting API server on port {port}...")
         uvicorn.run("screenshot_analyzer:app", host="0.0.0.0", port=port, reload=False)
     else:
-        # Run as command-line tool
+        print("[DEBUG] Running in local command-line mode. No server/API involved.")
         image_path = sys.argv[1]
         credentials_path = sys.argv[2] if len(sys.argv) > 2 else None
-        
-        # Initialize analyzer with credentials if provided
         analyzer = ScreenshotAnalyzer(credentials_path=credentials_path)
-        
-        # Process the image
         result = analyzer.process_image(image_path)
-        
-        # Print the result as formatted JSON
         print(json.dumps(result, indent=2))
 
 
