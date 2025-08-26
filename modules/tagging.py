@@ -1,178 +1,332 @@
+#!/usr/bin/env python3
 """
-Image tagging module for identifying objects and scenes in images.
+PicSortinator 3000 - ML Tagging Module
+=====================================
+
+Military-grade image classification using MobileNetV2.
+Because your photos deserve better than guesswork.
 """
 
 import os
+import cv2
+import numpy as np
+from PIL import Image
 import logging
-from pathlib import Path
+from typing import List, Dict, Tuple, Optional
+import tensorflow as tf
+from .model_manager import ModelManager
 
 logger = logging.getLogger(__name__)
 
 class ImageTagger:
-    """Tags images based on their content using pre-trained ML models."""
+    """ML-powered image content tagger with personality."""
     
-    def __init__(self):
-        """Initialize the image tagger with appropriate models."""
-        self.model_loaded = False
-        self.device = None
+    def __init__(self, models_dir: str = "models"):
+        """Initialize the image tagger with ML models."""
+        self.model_manager = ModelManager(models_dir)
         self.model = None
-        self.processor = None
+        self.labels = None
+        self.confidence_threshold = 0.1  # Lower threshold to catch more tags
+        self.input_size = (224, 224)  # MobileNetV2 input size
         
-        # Try to load the tagging model
-        try:
-            import torch
-            from transformers import AutoProcessor, AutoModelForZeroShotImageClassification
-            
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
-            
-            # Check if we're in a development environment
-            if "PYTEST_CURRENT_TEST" in os.environ:
-                logger.info("Running in test mode, skipping model loading")
-                return
-                
-            # Load model and processor
-            logger.info("Loading image tagging model...")
-            model_name = "openai/clip-vit-base-patch32"
-            
-            self.processor = AutoProcessor.from_pretrained(model_name)
-            self.model = AutoModelForZeroShotImageClassification.from_pretrained(model_name)
-            self.model.to(self.device)
-            
-            self.model_loaded = True
-            logger.info("Image tagging model loaded successfully")
-            
-        except ImportError as e:
-            logger.warning(f"Could not load tagging model: {e}")
-            logger.warning("Will use fallback tagging mechanism")
-        except Exception as e:
-            logger.error(f"Error loading tagging model: {e}")
+        # Sarcastic responses for different scenarios
+        self.funny_responses = {
+            'loading_model': [
+                "🤖 Teaching AI to judge your photo collection...",
+                "📸 Initializing the 'Is this actually art?' detector...",
+                "🧠 Loading models that understand your aesthetic choices better than you do..."
+            ],
+            'processing': [
+                "🔍 Analyzing... yep, that's definitely a thing.",
+                "🎯 Found: objects, questionable composition, infinite possibilities.",
+                "📊 Confidence level: Higher than your selfie game."
+            ],
+            'high_confidence': [
+                "💯 I'm absolutely certain this is what I think it is.",
+                "🎯 My neural networks are vibing with this image.",
+                "✅ This classification is more confident than your dating profile."
+            ],
+            'low_confidence': [
+                "🤔 I'm as confused about this image as you are about your life choices.",
+                "❓ Either this is abstract art, or I need new glasses.",
+                "🤷 My best guess is... *gestures vaguely*"
+            ]
+        }
+        
+        logger.info("🚀 ImageTagger initialized with ML superpowers")
     
-    def generate_tags(self, image_path):
-        """Generate tags for an image using ML model or fallback approach."""
+    def _load_model(self):
+        """Load the MobileNetV2 model and ImageNet labels."""
+        if self.model is not None:
+            return
+        
+        logger.info("📦 Loading MobileNetV2 model...")
+        
         try:
-            # Check if model is loaded
-            if self.model_loaded:
-                return self._generate_tags_with_model(image_path)
+            self.model = self.model_manager.load_mobilenet_model()
+            self.labels = self.model_manager.load_imagenet_labels()
+            logger.info(f"✅ Model loaded with {len(self.labels)} classes")
+        except Exception as e:
+            logger.error(f"❌ Failed to load model: {e}")
+            raise
+    
+    def generate_tags(self, image_path: str, max_tags: int = 5) -> List[str]:
+        """
+        Generate ML-powered content tags for an image.
+        
+        Args:
+            image_path: Path to the image file
+            max_tags: Maximum number of tags to return
+            
+        Returns:
+            List of content tags with confidence scores
+        """
+        self._load_model()
+        
+        try:
+            # Load and preprocess image
+            image = self._load_and_preprocess_image(image_path)
+            if image is None:
+                return ["unreadable_image"]
+            
+            # Run ML inference
+            predictions = self.model.predict(image, verbose=0)
+            
+            # Get top predictions
+            top_indices = np.argsort(predictions[0])[::-1][:max_tags * 2]  # Get more to filter
+            
+            tags = []
+            for idx in top_indices:
+                confidence = predictions[0][idx]
+                if confidence >= self.confidence_threshold:
+                    label = self.labels.get(idx, f"class_{idx}")
+                    # Clean up the label
+                    clean_label = self._clean_label(label)
+                    if clean_label and clean_label not in tags:
+                        tags.append(clean_label)
+                        if len(tags) >= max_tags:
+                            break
+            
+            # Add basic image properties
+            basic_tags = self._analyze_image_properties(image_path)
+            tags.extend([tag for tag in basic_tags if tag not in tags])
+            
+            return tags[:max_tags]
+            
+        except Exception as e:
+            logger.error(f"💥 Error generating tags for {image_path}: {e}")
+            return ["processing_error"]
+    
+    def _load_and_preprocess_image(self, image_path: str) -> Optional[np.ndarray]:
+        """
+        Load and preprocess an image for ML inference.
+        
+        Args:
+            image_path: Path to image
+            
+        Returns:
+            Preprocessed image array ready for model input
+        """
+        try:
+            # Load image with PIL (handles more formats)
+            with Image.open(image_path) as img:
+                # Convert to RGB if needed
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # Resize to model input size
+                img = img.resize(self.input_size, Image.Resampling.LANCZOS)
+                
+                # Convert to numpy array
+                image_array = np.array(img, dtype=np.float32)
+                
+                # Expand dimensions for batch processing
+                image_array = np.expand_dims(image_array, axis=0)
+                
+                # Preprocess for MobileNetV2
+                image_array = tf.keras.applications.mobilenet_v2.preprocess_input(image_array)
+                
+                return image_array
+                
+        except Exception as e:
+            logger.error(f"💥 Failed to load/preprocess image {image_path}: {e}")
+            return None
+    
+    def _clean_label(self, label: str) -> str:
+        """
+        Clean up ImageNet labels to be more user-friendly.
+        
+        Args:
+            label: Raw ImageNet label
+            
+        Returns:
+            Cleaned, user-friendly label
+        """
+        if not label:
+            return ""
+        
+        # Remove technical suffixes and clean up
+        clean = label.split(',')[0].strip().lower()
+        
+        # Remove common ImageNet artifacts
+        artifacts_to_remove = ['n02', 'n03', 'n04', 'n01']  # WordNet synset IDs
+        for artifact in artifacts_to_remove:
+            if clean.startswith(artifact):
+                return ""
+        
+        # Replace underscores and hyphens with spaces
+        clean = clean.replace('_', ' ').replace('-', ' ')
+        
+        # Remove extra whitespace
+        clean = ' '.join(clean.split())
+        
+        return clean
+    
+    def _analyze_image_properties(self, image_path: str) -> List[str]:
+        """
+        Analyze basic image properties for additional tags.
+        
+        Args:
+            image_path: Path to image file
+            
+        Returns:
+            List of property-based tags
+        """
+        tags = []
+        
+        try:
+            with Image.open(image_path) as img:
+                width, height = img.size
+                aspect_ratio = width / height
+                
+                # Orientation tags
+                if aspect_ratio > 1.3:
+                    tags.append("landscape_orientation")
+                elif aspect_ratio < 0.8:
+                    tags.append("portrait_orientation")
+                else:
+                    tags.append("square_format")
+                
+                # Resolution tags
+                total_pixels = width * height
+                if total_pixels > 8000000:  # > 8MP
+                    tags.append("high_resolution")
+                elif total_pixels < 500000:  # < 0.5MP
+                    tags.append("low_resolution")
+                
+                # File format
+                format_tag = f"{img.format.lower()}_format" if img.format else "unknown_format"
+                tags.append(format_tag)
+        
+        except Exception as e:
+            logger.error(f"Failed to analyze properties for {image_path}: {e}")
+        
+        return tags
+    
+    def get_detailed_analysis(self, image_path: str) -> Dict[str, any]:
+        """
+        Get detailed analysis including confidence scores and metadata.
+        
+        Args:
+            image_path: Path to image
+            
+        Returns:
+            Detailed analysis results
+        """
+        self._load_model()
+        
+        analysis = {
+            'image_path': image_path,
+            'tags': [],
+            'confidence_scores': {},
+            'top_predictions': [],
+            'image_properties': {},
+            'processing_notes': []
+        }
+        
+        try:
+            # Load and preprocess image
+            image = self._load_and_preprocess_image(image_path)
+            if image is None:
+                analysis['processing_notes'].append("Failed to load image")
+                return analysis
+            
+            # Run ML inference
+            predictions = self.model.predict(image, verbose=0)
+            
+            # Get top 10 predictions with confidence
+            top_indices = np.argsort(predictions[0])[::-1][:10]
+            
+            for idx in top_indices:
+                confidence = float(predictions[0][idx])
+                label = self.labels.get(idx, f"class_{idx}")
+                clean_label = self._clean_label(label)
+                
+                analysis['top_predictions'].append({
+                    'label': clean_label or label,
+                    'confidence': confidence,
+                    'class_id': int(idx)
+                })
+                
+                if confidence >= self.confidence_threshold and clean_label:
+                    analysis['tags'].append(clean_label)
+                    analysis['confidence_scores'][clean_label] = confidence
+            
+            # Add image properties
+            with Image.open(image_path) as img:
+                analysis['image_properties'] = {
+                    'width': img.width,
+                    'height': img.height,
+                    'format': img.format,
+                    'mode': img.mode,
+                    'aspect_ratio': round(img.width / img.height, 2)
+                }
+            
+            # Add a sarcastic comment based on confidence
+            max_confidence = max([p['confidence'] for p in analysis['top_predictions']])
+            if max_confidence > 0.8:
+                analysis['ai_comment'] = np.random.choice(self.funny_responses['high_confidence'])
             else:
-                return self._generate_tags_fallback(image_path)
+                analysis['ai_comment'] = np.random.choice(self.funny_responses['low_confidence'])
+                
         except Exception as e:
-            logger.error(f"Error generating tags for {image_path}: {e}")
-            return ["error"]
+            analysis['processing_notes'].append(f"Error during analysis: {e}")
+            logger.error(f"💥 Detailed analysis failed for {image_path}: {e}")
+        
+        return analysis
     
-    def _generate_tags_with_model(self, image_path):
-        """Generate tags using the loaded ML model."""
-        try:
-            from PIL import Image
+    def batch_tag_images(self, image_paths: List[str], progress_callback=None) -> Dict[str, List[str]]:
+        """
+        Tag multiple images efficiently.
+        
+        Args:
+            image_paths: List of image paths
+            progress_callback: Optional callback for progress updates
             
-            # Define candidate labels
-            candidate_labels = [
-                "person", "people", "animal", "cat", "dog", "bird", 
-                "landscape", "beach", "mountain", "city", "building",
-                "food", "selfie", "party", "document", "screenshot",
-                "meme", "funny", "sunset", "car", "vehicle", "nature",
-                "indoor", "outdoor", "text", "artwork", "drawing"
-            ]
-            
-            # Load and process image
-            image = Image.open(image_path)
-            inputs = self.processor(images=image, return_tensors="pt", text=candidate_labels)
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
-            
-            # Get model predictions
-            with torch.no_grad():
-                outputs = self.model(**inputs)
-                scores = outputs.logits_per_image[0]
-                scores = torch.nn.functional.softmax(scores, dim=0)
-            
-            # Get top 5 tags with scores above threshold
-            top_scores, top_indices = scores.topk(5)
-            threshold = 0.1  # Minimum confidence threshold
-            
-            tags = []
-            for score, idx in zip(top_scores, top_indices):
-                if score > threshold:
-                    tags.append(candidate_labels[idx])
-            
-            return tags if tags else ["unclassified"]
-            
-        except Exception as e:
-            logger.error(f"Model-based tagging failed: {e}")
-            return self._generate_tags_fallback(image_path)
-    
-    def _generate_tags_fallback(self, image_path):
-        """Generate tags using a simple fallback approach when ML is unavailable."""
-        try:
-            import cv2
-            import numpy as np
-            from PIL import Image
-            
-            # Load image
-            img = cv2.imread(str(image_path))
-            
-            if img is None:
-                return ["invalid_image"]
-            
-            tags = []
-            
-            # Get basic image properties
-            height, width, channels = img.shape
-            
-            # Check if it's likely a screenshot based on dimensions
-            common_screen_resolutions = [
-                (1920, 1080), (1280, 720), (1366, 768),
-                (2560, 1440), (3840, 2160)
-            ]
-            
-            if any(abs(width - w) < 5 and abs(height - h) < 5 for w, h in common_screen_resolutions):
-                tags.append("screenshot")
-            
-            # Check for faces (very basic)
+        Returns:
+            Dictionary mapping image paths to tags
+        """
+        results = {}
+        total = len(image_paths)
+        
+        logger.info(f"🚀 Starting batch tagging of {total} images...")
+        print(np.random.choice(self.funny_responses['loading_model']))
+        
+        for i, image_path in enumerate(image_paths, 1):
             try:
-                face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+                tags = self.generate_tags(image_path)
+                results[image_path] = tags
                 
-                if len(faces) > 0:
-                    tags.append("person")
-                    if len(faces) > 3:
-                        tags.append("group")
-            except:
-                pass
-            
-            # Check color properties
-            hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-            h, s, v = cv2.split(hsv)
-            
-            # Check if image is dark
-            if np.mean(v) < 50:
-                tags.append("dark")
-            
-            # Check if image is bright/colorful
-            if np.mean(s) > 100:
-                tags.append("colorful")
-                
-            # Check if image has significant green (potentially nature)
-            green_mask = cv2.inRange(hsv, (35, 50, 50), (85, 255, 255))
-            if np.count_nonzero(green_mask) > (width * height * 0.3):
-                tags.append("nature")
-                
-            # Check if image has significant blue (potentially sky/water)
-            blue_mask = cv2.inRange(hsv, (90, 50, 50), (130, 255, 255))
-            if np.count_nonzero(blue_mask) > (width * height * 0.3):
-                tags.append("sky")
-                
-            # Add aspect ratio related tags
-            aspect = width / height
-            if abs(aspect - 1) < 0.1:
-                tags.append("square")
-            elif aspect > 2:
-                tags.append("panorama")
-                
-            if not tags:
-                tags = ["unclassified"]
-                
-            return tags
-                
-        except Exception as e:
-            logger.error(f"Fallback tagging failed: {e}")
-            return ["unclassified"]
+                if progress_callback:
+                    progress_callback(i, total, image_path)
+                elif i % 10 == 0:  # Progress update every 10 images
+                    progress = (i / total) * 100
+                    print(f"📊 Progress: {progress:.1f}% ({i}/{total}) - {os.path.basename(image_path)}")
+                    
+            except Exception as e:
+                logger.error(f"💥 Failed to tag {image_path}: {e}")
+                results[image_path] = ["error"]
+        
+        logger.info(f"✅ Batch tagging completed! Tagged {len(results)} images.")
+        print("🎉 Tagging complete! Your photos have been judged and categorized.")
+        return results

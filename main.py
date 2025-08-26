@@ -1,32 +1,34 @@
 #!/usr/bin/env python3
 """
-Offline Funny Image Sorter - Main Application
-=============================================
+PicSortinator 3000 - Main Application
+====================================
 
-A humorous image organization tool that:
-- Loads and catalogs images from a folder
-- Tags images based on content using ML
-- Extracts text with OCR
-- Recognizes and groups faces
-- Provides search and filtering capabilities
-- Sorts images into organized folders
-- Does all this with a sense of humor!
+Military-grade image organization with ML superpowers.
+Sort, tag, and laugh at your messy photo collection — all offline.
+
+🚀 Features:
+- ML-powered image classification using MobileNetV2
+- Advanced OCR text extraction with preprocessing
+- Face detection and clustering (coming soon)
+- Duplicate image detection
+- Full-text search and metadata indexing
+- Sarcastic commentary throughout
 
 """
 
 import os
 import sys
-import sqlite3
 import logging
 from pathlib import Path
 from datetime import datetime
+from typing import List, Dict, Optional
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('image_sorter.log'),
+        logging.FileHandler('picsortinator.log'),
         logging.StreamHandler()
     ]
 )
@@ -34,72 +36,103 @@ logger = logging.getLogger(__name__)
 
 # Import modules
 try:
-    from modules.utils import setup_database, get_image_files, funny_message
+    from modules.loader import ImageLoader
+    from modules.database import DatabaseManager
     from modules.tagging import ImageTagger
     from modules.ocr import TextExtractor
     from modules.faces import FaceDetector
+    from modules.model_manager import ModelManager
 except ImportError as e:
-    logger.error(f"Failed to import modules: {e}")
-    print(f"Error: {e}")
-    print("Please make sure all dependencies are installed.")
-    print("Run: pip install -r requirements.txt")
+    logger.error(f"❌ Failed to import modules: {e}")
+    print(f"💥 Import Error: {e}")
+    print("🔧 Please make sure all dependencies are installed:")
+    print("   pip install -r requirements.txt")
+    print("💡 For TensorFlow issues on Windows, try:")
+    print("   pip install tensorflow-cpu")
     sys.exit(1)
 
-class ImageSorter:
-    """Main application class for the Image Sorter."""
+class PicSortinator:
+    """Military-grade image organization with ML superpowers and attitude."""
     
-    def __init__(self, db_path="data/image_sorter.db"):
-        """Initialize the Image Sorter application."""
+    def __init__(self, db_path: str = "data/picsortinator.db"):
+        """Initialize PicSortinator 3000 with all systems online."""
+        print("🚀 Initializing PicSortinator 3000...")
+        
         self.db_path = db_path
-        self.conn = setup_database(db_path)
+        self.loader = ImageLoader()
+        self.database = DatabaseManager(db_path)
         self.tagger = ImageTagger()
         self.text_extractor = TextExtractor()
         self.face_detector = FaceDetector()
-        logger.info("Image Sorter initialized successfully")
+        self.model_manager = ModelManager()
         
-    def scan_directory(self, directory_path):
-        """Scan a directory for images and add them to the database."""
-        image_files = get_image_files(directory_path)
-        total_images = len(image_files)
+        # Funny initialization messages
+        self.funny_messages = {
+            'scanning': [
+                "🔍 Scanning your photo collection like a forensic investigator...",
+                "📸 Loading images and judging your photography skills...",
+                "🧐 Analyzing your digital memories with AI precision..."
+            ],
+            'processing': [
+                "🤖 AI is now critiquing your life choices through images...",
+                "📊 Processing complete! Your photos have been sorted and mocked.",
+                "🎯 Mission accomplished! Another photo collection tamed."
+            ]
+        }
         
-        if total_images == 0:
-            print("No images found in the specified directory.")
+        logger.info("✅ PicSortinator 3000 initialized successfully")
+        print("✅ All systems online! Ready to sort and judge your photos.")
+        
+    def scan_directory(self, directory_path: str) -> int:
+        """Scan directory with ML-powered metadata extraction."""
+        import numpy as np
+        
+        print(f"\n🔍 Scanning directory: {directory_path}")
+        print(np.random.choice(self.funny_messages['scanning']))
+        
+        # Use new loader to scan directory
+        try:
+            image_files = self.loader.scan_directory(directory_path)
+            total_images = len(image_files)
+            
+            if total_images == 0:
+                print("😅 No images found. Either this directory is empty or you're looking in the wrong place.")
+                return 0
+            
+            print(f"✅ Found {total_images} images to process")
+            
+            added_count = 0
+            for idx, image_path in enumerate(image_files, 1):
+                try:
+                    # Extract comprehensive metadata
+                    metadata = self.loader.extract_metadata(image_path)
+                    if metadata:
+                        # Add file hash for duplicate detection
+                        metadata['file_hash'] = self.loader.get_file_hash(image_path)
+                        
+                        # Add to database
+                        image_id = self.database.add_image(metadata)
+                        if image_id:
+                            added_count += 1
+                        
+                        # Show progress
+                        if idx % 10 == 0 or idx == total_images:
+                            progress = (idx / total_images) * 100
+                            print(f"📊 Progress: {progress:.1f}% ({idx}/{total_images}) - {image_path.name}")
+                
+                except Exception as e:
+                    logger.error(f"💥 Error processing {image_path}: {e}")
+            
+            print(f"\n✅ Successfully added {added_count} images to database")
+            if added_count > 50:
+                print("📸 Wow, that's a lot of photos! Did you empty your entire phone?")
+            
+            return added_count
+            
+        except Exception as e:
+            logger.error(f"💥 Directory scanning failed: {e}")
+            print(f"❌ Scanning failed: {e}")
             return 0
-        
-        print(f"[INFO] Found {total_images} images in '{directory_path}'")
-        print(funny_message("loading", count=total_images))
-        
-        cursor = self.conn.cursor()
-        added_count = 0
-        
-        for idx, image_path in enumerate(image_files, 1):
-            try:
-                # Check if image already exists in DB
-                cursor.execute("SELECT id FROM images WHERE path = ?", (str(image_path),))
-                if cursor.fetchone():
-                    continue
-                
-                # Get basic image info
-                file_size = os.path.getsize(image_path)
-                creation_time = datetime.fromtimestamp(os.path.getctime(image_path))
-                
-                # Insert into database
-                cursor.execute(
-                    "INSERT INTO images (filename, path, size, creation_date, processed) VALUES (?, ?, ?, ?, ?)",
-                    (image_path.name, str(image_path), file_size, creation_time, False)
-                )
-                added_count += 1
-                
-                # Show progress
-                if idx % 10 == 0 or idx == total_images:
-                    print(f"Processing: {idx}/{total_images} ({idx/total_images*100:.1f}%)")
-                
-            except Exception as e:
-                logger.error(f"Error processing {image_path}: {e}")
-        
-        self.conn.commit()
-        print(f"Added {added_count} new images to the database")
-        return added_count
     
     def process_images(self, limit=None):
         """Process unprocessed images in the database."""
@@ -285,18 +318,26 @@ class ImageSorter:
         
     def close(self):
         """Close the database connection."""
-        if self.conn:
-            self.conn.close()
-            logger.info("Database connection closed")
+        if hasattr(self, 'database') and self.database:
+            self.database.close()
+            logger.info("✅ Database connection closed")
+            print("👋 PicSortinator 3000 shutting down. Your photos are now properly sorted!")
 
 def main():
     """Main entry point for the application."""
     print("\n" + "="*70)
-    print("🖼️  OFFLINE FUNNY IMAGE SORTER 🖼️")
+    print("🎆 PICSORTINATOR 3000 - ML-POWERED PHOTO SORTER 🎆")
+    print("="*70)
+    print("🤖 Sort, tag, and laugh at your messy photo collection")
+    print("🚀 Now with 100% more machine learning and sarcasm!")
     print("="*70)
     
-    # Create sorter instance
-    sorter = ImageSorter()
+    # Create PicSortinator instance
+    try:
+        sorter = PicSortinator()
+    except Exception as e:
+        print(f"❌ Failed to initialize PicSortinator: {e}")
+        return
     
     if len(sys.argv) < 2:
         print("\nUsage:")

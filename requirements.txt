@@ -6,12 +6,21 @@ face_recognition
 numpy
 tqdm
 
+# ML and Processing
+tensorflow>=2.12.0
+imagehash
+requests
+
 # Note: face_recognition requires dlib, which can be tricky on Windows
 # If you have installation issues:
 # 1. Install Visual Studio Build Tools or Visual Studio Community
 # 2. Install CMake: https://cmake.org/download/
 # 3. pip install dlib
 # 4. pip install face_recognition
+
+# Alternative lightweight options:
+# tensorflow-lite-runtime  # Use this instead of tensorflow for smaller installs
+# onnxruntime             # Alternative to TensorFlow
 
 # Built-in packages (no installation needed):
 # - sqlite3
