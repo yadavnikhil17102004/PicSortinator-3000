@@ -212,6 +212,47 @@ class DatabaseManager:
             
         except Exception as e:
             logger.error(f"Failed to update image analysis: {e}")
+            
+    def update_image_processing(self, image_id, tags=None, extracted_text=None, faces=None, confidence=None):
+        """
+        Update image with processing results.
+        
+        Args:
+            image_id (int): Image ID
+            tags (list): List of tags
+            extracted_text (str): OCR extracted text
+            faces (int or list): Number of faces or face data
+            confidence (float): ML confidence score
+            
+        Returns:
+            bool: True if update successful, False otherwise
+        """
+        try:
+            cursor = self.conn.cursor()
+            
+            # Convert tags to string if provided
+            tags_str = ",".join(tags) if tags else None
+            
+            # Handle faces parameter (could be count or actual face data)
+            faces_str = None
+            if isinstance(faces, int) and faces > 0:
+                faces_str = ",".join([f"person_{i}" for i in range(faces)])
+            elif isinstance(faces, list) and faces:
+                faces_str = ",".join([f"person_{i}" for i in range(len(faces))])
+            
+            cursor.execute('''
+                UPDATE images 
+                SET tags = ?, extracted_text = ?, faces = ?, ml_confidence = ?, processed = TRUE
+                WHERE id = ?
+            ''', (tags_str, extracted_text, faces_str, confidence, image_id))
+            
+            self.conn.commit()
+            logger.info(f"Updated processing for image ID: {image_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to update image processing: {e}")
+            return False
     
     def get_unprocessed_images(self, limit=None):
         """
@@ -301,6 +342,42 @@ class DatabaseManager:
             return cursor.fetchall()
         except Exception as e:
             logger.error(f"Failed to get all images: {e}")
+            return []
+    
+    def get_processed_images(self, limit=None):
+        """
+        Get processed images from the database.
+        
+        Args:
+            limit (int): Maximum number of images to return
+            
+        Returns:
+            list: List of processed image records
+        """
+        try:
+            cursor = self.conn.cursor()
+            query = '''
+                SELECT id, filename, path, tags, extracted_text, faces 
+                FROM images 
+                WHERE processed = TRUE
+            '''
+            
+            if limit:
+                query += f" LIMIT {limit}"
+                
+            cursor.execute(query)
+            
+            # Convert to dictionary for easier access
+            columns = [column[0] for column in cursor.description]
+            results = []
+            
+            for row in cursor.fetchall():
+                results.append(dict(zip(columns, row)))
+                
+            return results
+            
+        except Exception as e:
+            logger.error(f"Failed to get processed images: {e}")
             return []
     
     def get_image_stats(self):

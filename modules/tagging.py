@@ -295,6 +295,31 @@ class ImageTagger:
         
         return analysis
     
+    def tag_image(self, image_path: str) -> List[str]:
+        """
+        Generate tags for a single image.
+        
+        Args:
+            image_path: Path to the image file
+            
+        Returns:
+            List of content tags
+        """
+        logger.info(f"Tagging image: {image_path}")
+        
+        try:
+            # Use the existing generate_tags method
+            tags = self.generate_tags(image_path)
+            if tags:
+                logger.info(f"Generated {len(tags)} tags for {image_path}")
+                return tags
+            else:
+                logger.warning(f"No tags generated for {image_path}")
+                return []
+        except Exception as e:
+            logger.error(f"💥 Error tagging image {image_path}: {e}")
+            return ["error"]
+    
     def batch_tag_images(self, image_paths: List[str], progress_callback=None) -> Dict[str, List[str]]:
         """
         Tag multiple images efficiently.

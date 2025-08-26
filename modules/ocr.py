@@ -14,7 +14,13 @@ from PIL import Image, ImageEnhance
 import logging
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
-import imagehash
+
+# Optional import for duplicate detection
+try:
+    import imagehash
+    IMAGEHASH_AVAILABLE = True
+except ImportError:
+    IMAGEHASH_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +59,12 @@ class TextExtractor:
         try:
             import pytesseract
             from PIL import Image
+            
+            # Set the exact path to Tesseract since it's not in PATH
+            tesseract_path = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+            if os.path.exists(tesseract_path):
+                pytesseract.pytesseract.tesseract_cmd = tesseract_path
+                logger.info(f"✅ Found Tesseract at: {tesseract_path}")
             
             # Try a simple test to see if tesseract is available
             test_result = pytesseract.get_tesseract_version()
@@ -275,8 +287,11 @@ class TextExtractor:
             # Processed image analysis
             analysis['processed_size'] = processed_image.size
             
-            # Calculate image hash for duplicate detection
-            analysis['image_hash'] = str(imagehash.phash(processed_image))
+            # Calculate image hash for duplicate detection (if available)
+            if IMAGEHASH_AVAILABLE:
+                analysis['image_hash'] = str(imagehash.phash(processed_image))
+            else:
+                analysis['image_hash'] = 'unavailable'
             
             # Estimate text density (rough heuristic)
             img_array = np.array(processed_image)

@@ -64,13 +64,31 @@ coverage.xml
 Thumbs.db
 Desktop.ini
 
+# Virtual Environment
+venv/
+env/
+.env/
+
+# Project specific
+# Database files (uncomment if you don't want to track database in git)
+# data/*.db
+
+# Log files
+*.log
+image_sorter.log
+picsortinator.log
+
+# Output directory contents
+output/*
+!output/.gitkeep
+
+# Downloaded ML models (can be large)
+models/mobilenet_v2_imagenet.h5
+!models/imagenet_labels.txt
+
 # Test images and results
 test_images/
-output_dir/
 *.result.json
-
-# Logs
-*.log
 
 # Environment variables
 .env

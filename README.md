@@ -47,14 +47,47 @@ python main.py scan /path/to/your/photos
 # Process images with ML tagging, OCR, and face detection
 python main.py process
 
-# Search for images
-python main.py search "beach sunset"
+# Search for images with specific tags
+python main.py search "phone" 
+
+# View detailed information about a specific image
+python view_image.py id <image_id>
+python view_image.py file <filename>
+
+# Query database for images with specific tags
+python query_tags.py
 
 # Organize images by tags
 python main.py organize
 
 # Export your collection data
 python main.py export json
+```
+
+## Setup Notes
+
+### Tesseract OCR Configuration
+
+The system is configured to use Tesseract OCR from this default location:
+```
+C:\Program Files\Tesseract-OCR\tesseract.exe
+```
+
+If Tesseract is installed in a different location, you can modify the path in `modules/ocr.py`.
+
+### ML Model Information
+
+The application uses MobileNetV2 pre-trained on ImageNet for image classification. The model is automatically downloaded on first run and cached in the `models` directory.
+
+### Face Detection
+
+Basic face detection is implemented using OpenCV's Haar cascades. For advanced face recognition with dlib, additional setup may be required:
+
+```bash
+# On Windows with Visual Studio installed:
+pip install cmake
+pip install dlib
+pip install face_recognition
 ```
 
 ## Project Structure
@@ -64,14 +97,22 @@ PicSortinator-3000/
 ├── main.py                 # Entry point
 ├── requirements.txt        # Dependencies
 ├── README.md               # This file
+├── view_image.py           # Tool to view detailed image info
+├── query_tags.py           # Tool to query the database
 ├── modules/
+│   ├── __init__.py         # Package definition
 │   ├── loader.py           # Image scanning and metadata
 │   ├── tagging.py          # ML-based auto tagging
 │   ├── ocr.py              # Text recognition
 │   ├── faces.py            # Face detection + grouping
 │   ├── database.py         # SQLite handler
+│   ├── model_manager.py    # ML model management
 │   └── utils.py            # Shared helper functions
-├── data/                   # Input images for testing
+├── models/                 # ML models and data
+│   ├── mobilenet_v2_imagenet.h5  # Cached ML model
+│   └── imagenet_labels.txt       # Class labels
+├── data/                   # Database storage
+│   └── picsortinator.db    # SQLite database
 ├── output/                 # Sorted/exported results
 └── tests/                  # Test scripts
 ```
@@ -83,11 +124,11 @@ PicSortinator-3000/
 - [x] Basic image loading and metadata extraction
 - [x] CLI interface foundation
 
-### Phase 2: Analysis Engine 🚧
-- [ ] ML-based image tagging with pre-trained models
-- [ ] OCR text extraction and indexing
-- [ ] Face detection and clustering
-- [ ] Duplicate image detection
+### Phase 2: Analysis Engine ✅
+- [x] ML-based image tagging with pre-trained models (MobileNetV2)
+- [x] OCR text extraction and indexing (Tesseract)
+- [x] Basic face detection (OpenCV)
+- [x] Image orientation and format detection
 
 ### Phase 3: Smart Organization 📋
 - [ ] Intelligent folder sorting algorithms
