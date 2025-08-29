@@ -4,6 +4,9 @@ PicSortinator 3000 - Image Loader Module
 ========================================
 
 Handles scanning directories for images and extracting basic metadata.
+
+📁 This module is like a digital bloodhound - it WILL find your images!
+🔍 Warning: May discover embarrassing photos you forgot you had.
 """
 
 import os

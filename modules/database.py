@@ -4,6 +4,10 @@ PicSortinator 3000 - Database Module
 ====================================
 
 Handles SQLite database operations for storing image metadata and analysis results.
+
+💾 Fun Fact: This database has indexed more memories than your brain can store!
+🔍 Easter Egg: Full-text search so powerful, it can find that one meme from 2019.
+📊 Warning: May become sentient and start organizing your life outside of photos.
 """
 
 import os

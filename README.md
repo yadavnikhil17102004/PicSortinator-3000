@@ -15,8 +15,9 @@ PicSortinator 3000 brings military-grade organization to your photo chaos:
 ### 🤖 **AI-Powered Analysis**
 - **Smart ML Tagging**: MobileNetV2-powered content recognition with 1000+ ImageNet classes
 - **OCR Text Extraction**: Makes text in your screenshots and documents searchable
-- **Face Detection**: Groups photos by people (OpenCV-based, with optional dlib support)
+- **Face Detection**: Groups photos by people (no more faces in your curry photos! 🍛)
 - **Confidence Scoring**: Know how sure the AI is about its classifications
+- **Easter Egg Detection**: Hidden jokes for developers who read the code (you found one!) 🥚
 
 ### 📁 **Advanced Organization**
 - **Multi-format Support**: JPG, PNG, BMP, GIF, TIFF, WebP, and more

@@ -5,6 +5,10 @@ PicSortinator 3000 - ML Tagging Module
 
 Military-grade image classification using MobileNetV2.
 Because your photos deserve better than guesswork.
+
+🎯 Fun Fact: This AI has seen more images than a social media influencer!
+🤖 Warning: May develop strong opinions about your photography skills.
+🏷️  Easter Egg: The confidence threshold is like a bouncer at an exclusive club - very picky!
 """
 
 import os

@@ -5,6 +5,12 @@ PicSortinator 3000 - OCR Module
 
 Extracts text from images with surgical precision.
 Because your screenshots deserve to be searchable.
+
+🔍 Historical Note: This module has been through more transformations than a Transformer model!
+We've learned that sometimes less preprocessing is more... who knew? 🤷‍♂️
+
+⚠️  Warning: May occasionally read "COFFEE" as "C0FF33" - we're working on it!
+🎯 Pro Tip: If it looks like gibberish, it probably was gibberish to begin with.
 """
 
 import os
@@ -133,7 +139,13 @@ class TextExtractor:
             return "Text extraction failed"
     
     def _is_meaningful_text(self, text: str) -> bool:
-        """Very strict check for meaningful text (no random character strings)."""
+        """
+        Very strict check for meaningful text (no random character strings).
+        
+        🤖 This function has seen things... terrible, terrible OCR things.
+        Like "Hello World" becoming "H3||0 W0r1d" or worse: "SOOTAEINSBET f Biles"
+        We're the last line of defense against gibberish! 🛡️
+        """
         if not text or len(text.strip()) < 3:
             return False
         

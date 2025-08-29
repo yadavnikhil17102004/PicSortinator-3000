@@ -3,6 +3,9 @@
 Basic PicSortinator 3000 Workflow Example
 =========================================
 Demonstrates the complete workflow from scanning to search.
+
+🎬 This is like a movie, but instead of explosions, we have image processing!
+🤖 Spoiler alert: The AI wins in the end.
 """
 
 import sys
@@ -22,6 +25,8 @@ def basic_workflow_example():
     
     print("🎆 PicSortinator 3000 - Basic Workflow Example")
     print("=" * 60)
+    print("🤖 Initializing the AI overlords... just kidding, they're friendly!")
+    print("")
     
     # Initialize components
     print("🚀 Initializing components...")
@@ -37,6 +42,7 @@ def basic_workflow_example():
     if not os.path.exists(image_directory):
         print(f"❌ Directory {image_directory} not found.")
         print("Please create a 'test_images' directory with some sample images.")
+        print("🎭 Pro tip: Add some variety - landscapes, people, food, memes... we're not picky!")
         return
     
     # Step 1: Scan for images

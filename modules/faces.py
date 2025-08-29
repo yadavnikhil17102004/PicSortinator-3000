@@ -1,5 +1,10 @@
 """
 Face detection and recognition module using modern deep learning approaches.
+
+🤖 Fun Fact: This module has evolved from detecting faces in everything (including your breakfast)
+to actually knowing what a face is! We've come a long way from the Haar cascade days of 2001.
+
+💡 Easter Egg: If you're reading this, you're probably debugging why your sandwich was tagged as "3 people"
 """
 
 import os
@@ -113,6 +118,7 @@ class FaceDetector:
             food_keywords = ['curry', 'food', 'dish', 'meal', 'recipe', 'cooking', 'kitchen', 'plate', 'bowl', 'soup']
             if any(keyword in filename for keyword in food_keywords):
                 logger.debug(f"Skipping face detection for likely food image: {filename}")
+                # 🍛 Fun fact: We used to think curry had faces. It was a dark time in AI history.
                 return []
             
             # Method 1: MediaPipe (fastest and most accurate for general use)

@@ -30,6 +30,7 @@ def search_examples():
     if total_images == 0:
         print("❌ No images in database yet!")
         print("Run the basic workflow example first to add some images.")
+        print("🎭 It's like trying to search an empty library - technically possible, but not very useful!")
         return
     
     print(f"📊 Database contains {total_images} images")
