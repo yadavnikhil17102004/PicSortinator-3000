@@ -76,43 +76,241 @@ class TextExtractor:
             logger.warning("📖 Text extraction will be limited")
     
     def extract_text(self, image_path: str) -> str:
-        """Extract text from an image using advanced OCR preprocessing."""
+        """Extract text from an image using conservative OCR approach."""        
         if not self.tesseract_available:
             return np.random.choice(self.funny_responses['no_tesseract'])
         
         try:
             import pytesseract
             
-            # Load and preprocess the image
-            processed_image = self._preprocess_image(image_path)
-            if processed_image is None:
-                return "Could not load or process image"
+            # Step 1: Try original image with minimal config (most conservative)
+            try:
+                with Image.open(image_path) as img:
+                    # Convert to RGB if needed
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    
+                    # Try very simple OCR first
+                    simple_config = '--oem 3 --psm 3'
+                    simple_text = pytesseract.image_to_string(img, config=simple_config, lang='eng')
+                    
+                    if self._is_meaningful_text(simple_text):
+                        cleaned = self._aggressive_clean_text(simple_text)
+                        if cleaned:
+                            return cleaned
+            except Exception as e:
+                logger.debug(f"Simple OCR failed: {e}")
             
-            # Configure tesseract for better accuracy
-            config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ .,!?@#$%^&*()_+-=[]{}|;:"<>?/~`'
+            # Step 2: Try with very light preprocessing if simple OCR failed
+            try:
+                cv_image = cv2.imread(image_path)
+                if cv_image is not None:
+                    # Convert to grayscale
+                    gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
+                    
+                    # Only apply CLAHE for contrast enhancement (no other processing)
+                    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+                    enhanced = clahe.apply(gray)
+                    
+                    # Convert back to PIL
+                    pil_image = Image.fromarray(enhanced)
+                    
+                    # Try OCR on enhanced image
+                    enhanced_text = pytesseract.image_to_string(pil_image, config='--oem 3 --psm 3', lang='eng')
+                    
+                    if self._is_meaningful_text(enhanced_text):
+                        cleaned = self._aggressive_clean_text(enhanced_text)
+                        if cleaned:
+                            return cleaned
+            except Exception as e:
+                logger.debug(f"Enhanced OCR failed: {e}")
             
-            # Extract text
-            text = pytesseract.image_to_string(processed_image, config=config)
-            
-            # Clean up the text
-            text = self._clean_extracted_text(text)
-            
-            if not text or len(text.strip()) < 3:
-                return np.random.choice(self.funny_responses['no_text'])
-            
-            # Add some personality based on text length
-            if len(text) > 500:
-                logger.info("📚 Extracted lots of text - this was probably a document")
-            
-            return text
+            # Step 3: If still no good text, return "no text found"
+            return "No readable text found"
             
         except Exception as e:
             logger.error(f"💥 Error extracting text from {image_path}: {e}")
             return "Text extraction failed"
     
-    def _preprocess_image(self, image_path: str) -> Optional[Image.Image]:
+    def _is_meaningful_text(self, text: str) -> bool:
+        """Very strict check for meaningful text (no random character strings)."""
+        if not text or len(text.strip()) < 3:
+            return False
+        
+        # Remove whitespace and newlines
+        clean_text = ''.join(text.split())
+        
+        # Must be at least 3 characters
+        if len(clean_text) < 3:
+            return False
+        
+        # Check for meaningful English words pattern
+        import re
+        
+        # Look for actual words (3+ letters)
+        words = re.findall(r'\b[a-zA-Z]{3,}\b', text)
+        
+        # Must have at least 1 meaningful word
+        if len(words) < 1:
+            return False
+        
+        # Check for dictionary-like words (common English patterns)
+        common_patterns = [
+            r'\b(the|and|for|are|but|not|you|all|can|had|her|was|one|our|out|day|get|has|him|his|how|its|may|new|now|old|see|two|way|who|boy|did|man|men|put|say|she|too|use)\b',
+            r'\b[A-Z][a-z]{2,}\b',  # Capitalized words
+            r'\b\d+\b'  # Numbers
+        ]
+        
+        # At least one pattern should match
+        for pattern in common_patterns:
+            if re.search(pattern, text, re.IGNORECASE):
+                return True
+        
+        return False
+    
+    def _aggressive_clean_text(self, text: str) -> str:
+        """Aggressively clean text to remove OCR artifacts."""
+        if not text:
+            return ""
+        
+        import re
+        
+        # Remove obvious OCR artifacts
+        lines = text.split('\n')
+        clean_lines = []
+        
+        for line in lines:
+            line = line.strip()
+            
+            # Skip empty lines
+            if not line:
+                continue
+            
+            # Skip lines that are mostly special characters or single chars
+            if len(line) < 3:
+                continue
+            
+            # Skip lines with too many consecutive consonants (OCR errors)
+            if re.search(r'[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]{4,}', line):
+                continue
+            
+            # Skip lines with too many numbers mixed with letters randomly
+            if re.search(r'[a-zA-Z]\d[a-zA-Z]\d[a-zA-Z]', line):
+                continue
+            
+            # Only keep lines with recognizable word patterns
+            words = re.findall(r'\b[a-zA-Z]{2,}\b', line)
+            if len(words) >= 1:  # At least 1 word
+                clean_lines.append(line)
+        
+        result = ' '.join(clean_lines)
+        
+        # Final cleanup
+        result = re.sub(r'\s+', ' ', result)  # Multiple spaces to single
+        result = result.strip()
+        
+        return result if len(result) >= 3 else ""
+        """Try extracting text with minimal preprocessing first."""
+        try:
+            import pytesseract
+            from PIL import Image
+            
+            # Load image with minimal processing
+            with Image.open(image_path) as img:
+                # Convert to RGB if needed
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # Simple config for clear text
+                config = '--oem 3 --psm 3 -c tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ .,!?@#$%^&*()_+-=[]{}|;:"<>?/~`"'
+                text = pytesseract.image_to_string(img, config=config, lang='eng')
+                
+                return text
+                
+        except Exception as e:
+            logger.debug(f"Minimal preprocessing failed: {e}")
+            return ""
+    
+    def _preprocess_gently(self, image_path: str) -> Optional[Image.Image]:
+        """Apply gentle preprocessing that preserves text quality."""
+        try:
+            # Load image with OpenCV
+            cv_image = cv2.imread(image_path)
+            if cv_image is None:
+                return None
+            
+            # Convert to grayscale
+            gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
+            
+            # Very light denoising (preserve text details)
+            denoised = cv2.fastNlMeansDenoising(gray, h=5)
+            
+            # Light CLAHE for contrast enhancement
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(16,16))
+            enhanced = clahe.apply(denoised)
+            
+            # Convert back to PIL Image
+            pil_image = Image.fromarray(enhanced)
+            
+            return pil_image
+            
+        except Exception as e:
+            logger.debug(f"Gentle preprocessing failed: {e}")
+            return None
+    
+    def _is_good_text(self, text: str) -> bool:
+        """Check if extracted text is meaningful and not random characters."""
+        if not text or len(text.strip()) < 2:
+            return False
+        
+        # Count alphanumeric characters vs total characters
+        alpha_num = sum(1 for c in text if c.isalnum())
+        total_chars = len(text)
+        
+        if total_chars == 0:
+            return False
+        
+        # Lower threshold for alphanumeric ratio (was 0.3, now 0.2)
+        if (alpha_num / total_chars) < 0.2:
+            return False
+        
+        # Check for meaningful words (at least 2 letters, was 3 letters)
+        words = [word for word in text.split() if len(word) >= 2 and word.isalpha()]
+        if len(words) < 1:  # Was 2, now 1
+            return False
+        
+        # Additional check: if we have at least 3 alphanumeric characters in a row, it's probably text
+        import re
+        if re.search(r'[a-zA-Z0-9]{3,}', text):
+            return True
+        
+        return True  # More permissive
+    
+    def _calculate_text_confidence(self, text: str) -> float:
+        """Calculate a confidence score for extracted text."""
+        if not text:
+            return 0.0
+        
+        # Get word-level confidence data
+        try:
+            import pytesseract
+            # This is a simplified confidence calculation
+            words = text.split()
+            if not words:
+                return 0.0
+            
+            # Simple heuristic: longer meaningful words = higher confidence
+            meaningful_words = [w for w in words if len(w) >= 3 and w.isalpha()]
+            confidence = min(len(meaningful_words) / len(words), 1.0)
+            
+            return confidence
+            
+        except Exception:
+            return 0.5  # Default confidence
+    
+    def _preprocess_image_smart(self, image_path: str) -> Optional[Image.Image]:
         """
-        Preprocess image for better OCR accuracy.
+        Smart preprocessing that adapts to different image types.
         
         Args:
             image_path: Path to image file
@@ -121,44 +319,171 @@ class TextExtractor:
             Preprocessed PIL Image or None if failed
         """
         try:
-            # Load image with OpenCV for advanced preprocessing
+            # Load image with OpenCV
             cv_image = cv2.imread(image_path)
             if cv_image is None:
                 return None
             
+            # Get image characteristics
+            height, width = cv_image.shape[:2]
+            aspect_ratio = width / height
+            
             # Convert to grayscale
             gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
             
-            # Apply multiple preprocessing techniques
+            # Analyze image to determine best preprocessing approach
+            image_analysis = self._analyze_image_for_ocr(gray)
             
-            # 1. Noise reduction
-            denoised = cv2.fastNlMeansDenoising(gray)
-            
-            # 2. Increase contrast
-            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-            contrast_enhanced = clahe.apply(denoised)
-            
-            # 3. Adaptive thresholding (works better than simple thresholding)
-            thresh = cv2.adaptiveThreshold(
-                contrast_enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
-            )
-            
-            # 4. Morphological operations to clean up
-            kernel = np.ones((1,1), np.uint8)
-            cleaned = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+            # Adaptive preprocessing based on image characteristics
+            if image_analysis['is_text_document']:
+                # For documents: mild preprocessing
+                processed = self._preprocess_document(gray)
+            elif image_analysis['is_low_contrast']:
+                # For low contrast images: enhance contrast
+                processed = self._preprocess_low_contrast(gray)
+            elif image_analysis['has_noise']:
+                # For noisy images: denoise
+                processed = self._preprocess_noisy(gray)
+            else:
+                # Default preprocessing
+                processed = self._preprocess_standard(gray)
             
             # Convert back to PIL Image
-            pil_image = Image.fromarray(cleaned)
+            pil_image = Image.fromarray(processed)
             
-            # 5. Additional PIL enhancements
-            enhancer = ImageEnhance.Sharpness(pil_image)
-            sharpened = enhancer.enhance(1.5)
-            
-            return sharpened
+            return pil_image
             
         except Exception as e:
             logger.error(f"💥 Failed to preprocess image {image_path}: {e}")
             return None
+    
+    def _analyze_image_for_ocr(self, gray_image: np.ndarray) -> Dict[str, bool]:
+        """
+        Analyze image characteristics to determine best preprocessing approach.
+        
+        Args:
+            gray_image: Grayscale image array
+            
+        Returns:
+            Dictionary with analysis results
+        """
+        analysis = {
+            'is_text_document': False,
+            'is_low_contrast': False,
+            'has_noise': False,
+            'is_high_resolution': False
+        }
+        
+        try:
+            # Check contrast
+            min_val, max_val = np.min(gray_image), np.max(gray_image)
+            contrast_ratio = (max_val - min_val) / 255.0
+            analysis['is_low_contrast'] = contrast_ratio < 0.3
+            
+            # Check for noise (using Laplacian variance)
+            laplacian_var = cv2.Laplacian(gray_image, cv2.CV_64F).var()
+            analysis['has_noise'] = laplacian_var < 100
+            
+            # Check resolution
+            height, width = gray_image.shape
+            total_pixels = height * width
+            analysis['is_high_resolution'] = total_pixels > 1000000  # > 1MP
+            
+            # Simple heuristic for text documents (high contrast, uniform background)
+            if contrast_ratio > 0.5 and laplacian_var > 200:
+                analysis['is_text_document'] = True
+                
+        except Exception as e:
+            logger.debug(f"Image analysis failed: {e}")
+        
+        return analysis
+    
+    def _preprocess_document(self, gray_image: np.ndarray) -> np.ndarray:
+        """Preprocessing optimized for text documents."""
+        try:
+            # Mild denoising
+            denoised = cv2.fastNlMeansDenoising(gray_image, h=10)
+            
+            # CLAHE for contrast enhancement
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+            enhanced = clahe.apply(denoised)
+            
+            # Light Gaussian blur to reduce noise
+            blurred = cv2.GaussianBlur(enhanced, (3, 3), 0)
+            
+            # Adaptive thresholding
+            thresh = cv2.adaptiveThreshold(
+                blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+            )
+            
+            return thresh
+            
+        except Exception as e:
+            logger.debug(f"Document preprocessing failed: {e}")
+            return gray_image
+    
+    def _preprocess_low_contrast(self, gray_image: np.ndarray) -> np.ndarray:
+        """Preprocessing for low contrast images."""
+        try:
+            # Stronger contrast enhancement
+            clahe = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(8,8))
+            enhanced = clahe.apply(gray_image)
+            
+            # Sharpening
+            kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+            sharpened = cv2.filter2D(enhanced, -1, kernel)
+            
+            # Adaptive thresholding
+            thresh = cv2.adaptiveThreshold(
+                sharpened, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+            )
+            
+            return thresh
+            
+        except Exception as e:
+            logger.debug(f"Low contrast preprocessing failed: {e}")
+            return gray_image
+    
+    def _preprocess_noisy(self, gray_image: np.ndarray) -> np.ndarray:
+        """Preprocessing for noisy images."""
+        try:
+            # Strong denoising
+            denoised = cv2.fastNlMeansDenoising(gray_image, h=15)
+            
+            # Bilateral filter to preserve edges
+            filtered = cv2.bilateralFilter(denoised, 9, 75, 75)
+            
+            # Adaptive thresholding
+            thresh = cv2.adaptiveThreshold(
+                filtered, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+            )
+            
+            return thresh
+            
+        except Exception as e:
+            logger.debug(f"Noisy image preprocessing failed: {e}")
+            return gray_image
+    
+    def _preprocess_standard(self, gray_image: np.ndarray) -> np.ndarray:
+        """Standard preprocessing for general images."""
+        try:
+            # Moderate denoising
+            denoised = cv2.fastNlMeansDenoising(gray_image, h=10)
+            
+            # CLAHE
+            clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+            enhanced = clahe.apply(denoised)
+            
+            # Adaptive thresholding
+            thresh = cv2.adaptiveThreshold(
+                enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+            )
+            
+            return thresh
+            
+        except Exception as e:
+            logger.debug(f"Standard preprocessing failed: {e}")
+            return gray_image
     
     def _clean_extracted_text(self, text: str) -> str:
         """

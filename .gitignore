@@ -54,47 +54,69 @@ coverage.xml
 # Pyre type checker
 .pyre/
 
-# VS Code
+# IDEs
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# Mac
+# OS specific files
 .DS_Store
-
-# Windows
 Thumbs.db
 Desktop.ini
+*.lnk
 
 # Virtual Environment
 venv/
 env/
 .env/
-
-# Project specific
-# Database files (uncomment if you don't want to track database in git)
-# data/*.db
-
-# Log files
-*.log
-image_sorter.log
-picsortinator.log
-
-# Output directory contents
-output/*
-!output/.gitkeep
-
-# Downloaded ML models (can be large)
-models/mobilenet_v2_imagenet.h5
-!models/imagenet_labels.txt
-
-# Test images and results
-test_images/
-*.result.json
+.venv/
 
 # Environment variables
 .env
 .env.*
 
-# Misc
-*.bak
-*.swp
+# Project specific
+# Database files (uncomment to exclude from git)
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# Log files
+*.log
+logs/
+
+# Output directory contents (keep structure, exclude files)
+output/*
+!output/.gitkeep
+
+# Downloaded ML models (large files)
+models/*.h5
+models/*.pkl
+models/*.pb
+models/*.onnx
+!models/imagenet_labels.txt
+!models/.gitkeep
+
+# Test data and temporary files
+test_images/
+temp/
+tmp/
 *.tmp
+*.bak
+*.cache
+
+# Generated documentation
+docs/_build/
+docs/build/
+
+# Performance profiling
+*.prof
+
+# Misc development files
+.pytest_cache/
+.coverage
+htmlcov/
+*.result.json
+*.debug

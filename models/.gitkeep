@@ -1,3 +1,4 @@
 # Keep this directory
 *
 !.gitkeep
+!imagenet_labels.txt

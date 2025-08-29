@@ -26,8 +26,52 @@ class ImageTagger:
         self.model_manager = ModelManager(models_dir)
         self.model = None
         self.labels = None
-        self.confidence_threshold = 0.1  # Lower threshold to catch more tags
+        self.confidence_threshold = 0.2  # Reduced from 0.3 to get more tags
         self.input_size = (224, 224)  # MobileNetV2 input size
+        
+        # Enhanced useful categories with more specific terms
+        self.useful_categories = {
+            # People
+            'person', 'people', 'man', 'woman', 'child', 'baby', 'face', 'portrait', 'selfie',
+            'human', 'boy', 'girl', 'adult', 'family',
+            # Clothing & Fashion
+            'shirt', 'dress', 'jacket', 'coat', 'sweater', 'sweatshirt', 'hoodie', 'jeans',
+            'pants', 'skirt', 'shoes', 'sneakers', 'boots', 'hat', 'cap', 'glasses',
+            'fashion', 'clothing', 'outfit', 'style',
+            # Vehicles
+            'car', 'automobile', 'truck', 'bus', 'motorcycle', 'bicycle', 'bike', 'vehicle',
+            'taxi', 'van', 'suv', 'sedan', 'convertible',
+            # Animals
+            'dog', 'cat', 'bird', 'horse', 'cow', 'sheep', 'pig', 'chicken', 'duck',
+            'pet', 'animal', 'wildlife', 'mammal',
+            # Food & Drinks
+            'food', 'pizza', 'cake', 'sandwich', 'burger', 'bread', 'fruit', 'vegetable',
+            'apple', 'banana', 'orange', 'salad', 'soup', 'meal', 'dinner', 'lunch',
+            'breakfast', 'coffee', 'tea', 'drink', 'beer', 'wine', 'juice',
+            # Architecture & Places
+            'building', 'house', 'home', 'church', 'castle', 'bridge', 'tower',
+            'architecture', 'city', 'town', 'street', 'road', 'highway',
+            # Nature & Outdoors
+            'tree', 'flower', 'plant', 'mountain', 'beach', 'ocean', 'sea', 'lake',
+            'sky', 'sunset', 'sunrise', 'cloud', 'nature', 'landscape', 'garden',
+            'forest', 'park', 'outdoor', 'scenery',
+            # Technology
+            'phone', 'computer', 'laptop', 'keyboard', 'screen', 'tv', 'television',
+            'camera', 'technology', 'electronic', 'device',
+            # Objects & Items
+            'book', 'newspaper', 'document', 'paper', 'letter', 'text', 'magazine',
+            'furniture', 'chair', 'table', 'bed', 'sofa', 'desk',
+            'kitchen', 'bathroom', 'bedroom', 'living_room', 'office', 'room',
+            # Activities & Sports
+            'sports', 'game', 'ball', 'tennis', 'football', 'basketball', 'soccer',
+            'baseball', 'swimming', 'running', 'exercise', 'gym',
+            # Entertainment
+            'music', 'guitar', 'piano', 'instrument', 'concert', 'performance',
+            'art', 'painting', 'drawing', 'sculpture', 'museum',
+            # Events & Occasions
+            'party', 'wedding', 'birthday', 'celebration', 'event', 'holiday',
+            'christmas', 'halloween', 'vacation', 'travel', 'trip'
+        }
         
         # Sarcastic responses for different scenarios
         self.funny_responses = {
@@ -92,8 +136,8 @@ class ImageTagger:
             # Run ML inference
             predictions = self.model.predict(image, verbose=0)
             
-            # Get top predictions
-            top_indices = np.argsort(predictions[0])[::-1][:max_tags * 2]  # Get more to filter
+            # Get top predictions with higher confidence
+            top_indices = np.argsort(predictions[0])[::-1][:20]  # Get more candidates
             
             tags = []
             for idx in top_indices:
@@ -102,20 +146,100 @@ class ImageTagger:
                     label = self.labels.get(idx, f"class_{idx}")
                     # Clean up the label
                     clean_label = self._clean_label(label)
-                    if clean_label and clean_label not in tags:
+                    
+                    # Only add if it's a useful category and not already in tags
+                    if (clean_label and 
+                        self._is_useful_tag(clean_label) and 
+                        clean_label not in tags):
                         tags.append(clean_label)
                         if len(tags) >= max_tags:
                             break
+            
+            # If we don't have enough meaningful tags, try with lower confidence
+            if len(tags) < 2:
+                for idx in top_indices:
+                    confidence = predictions[0][idx]
+                    if confidence >= 0.1:  # Very low threshold for backup tags
+                        label = self.labels.get(idx, f"class_{idx}")
+                        clean_label = self._clean_label(label)
+                        
+                        if (clean_label and 
+                            self._is_useful_tag(clean_label) and 
+                            clean_label not in tags):
+                            tags.append(clean_label)
+                            if len(tags) >= max_tags:
+                                break
             
             # Add basic image properties
             basic_tags = self._analyze_image_properties(image_path)
             tags.extend([tag for tag in basic_tags if tag not in tags])
             
-            return tags[:max_tags]
+            return tags[:max_tags] if tags else ["unclear_content"]
             
         except Exception as e:
             logger.error(f"💥 Error generating tags for {image_path}: {e}")
             return ["processing_error"]
+    
+    def _is_useful_tag(self, tag: str) -> bool:
+        """
+        Check if a tag is useful and relevant for photo organization.
+        
+        Args:
+            tag: Cleaned tag to evaluate
+            
+        Returns:
+            True if tag is useful, False otherwise
+        """
+        if not tag or len(tag) < 2:
+            return False
+        
+        # Check if tag contains useful keywords
+        tag_lower = tag.lower()
+        
+        # Filter out generic/unuseful tags
+        useless_tags = {
+            'artifact', 'noise', 'blur', 'distortion', 'pattern', 'texture',
+            'background', 'foreground', 'object', 'thing', 'item', 'stuff',
+            'color', 'shape', 'form', 'structure', 'material', 'substance',
+            'n02', 'n03', 'n04', 'n01', 'class'  # ImageNet technical suffixes
+        }
+        
+        # Skip if tag contains useless words
+        for useless in useless_tags:
+            if useless in tag_lower:
+                return False
+        
+        # Check if tag contains any useful category words
+        useful_keywords = [
+            'person', 'people', 'man', 'woman', 'child', 'baby', 'face', 'portrait', 'selfie',
+            'car', 'automobile', 'truck', 'bus', 'motorcycle', 'bicycle', 'vehicle',
+            'dog', 'cat', 'bird', 'horse', 'cow', 'animal', 'pet',
+            'food', 'pizza', 'cake', 'sandwich', 'fruit', 'vegetable', 'meal',
+            'building', 'house', 'church', 'castle', 'bridge', 'architecture',
+            'tree', 'flower', 'plant', 'mountain', 'beach', 'ocean', 'sky', 'sunset', 'nature', 'landscape',
+            'phone', 'computer', 'laptop', 'keyboard', 'screen', 'tv', 'technology',
+            'book', 'newspaper', 'document', 'paper', 'letter', 'text',
+            'kitchen', 'bathroom', 'bedroom', 'living_room', 'office', 'indoor',
+            'car_interior', 'street', 'road', 'highway', 'parking_lot', 'outdoor',
+            'sports', 'game', 'ball', 'tennis', 'football', 'basketball',
+            'music', 'guitar', 'piano', 'instrument',
+            'art', 'painting', 'drawing', 'sculpture',
+            'fashion', 'clothing', 'shirt', 'dress', 'shoes',
+            'travel', 'vacation', 'holiday', 'trip'
+        ]
+        
+        for keyword in useful_keywords:
+            if keyword in tag_lower:
+                return True
+        
+        # Allow specific object names (longer than 4 chars and likely real objects)
+        if len(tag) > 4 and tag_lower.replace(' ', '').replace('-', '').isalnum():
+            # Check if it looks like a real word/phrase
+            words = tag_lower.split()
+            if all(len(word) >= 3 for word in words):
+                return True
+        
+        return False
     
     def _load_and_preprocess_image(self, image_path: str) -> Optional[np.ndarray]:
         """
@@ -128,29 +252,59 @@ class ImageTagger:
             Preprocessed image array ready for model input
         """
         try:
-            # Load image with PIL (handles more formats)
-            with Image.open(image_path) as img:
-                # Convert to RGB if needed
-                if img.mode != 'RGB':
-                    img = img.convert('RGB')
+            # Handle Unicode file paths by using raw byte reading
+            try:
+                # Method 1: Direct PIL opening (works for most cases)
+                with Image.open(image_path) as img:
+                    return self._process_image(img)
+            except (UnicodeDecodeError, OSError) as e:
+                logger.warning(f"Unicode/path issue with {image_path}: {e}")
                 
-                # Resize to model input size
-                img = img.resize(self.input_size, Image.Resampling.LANCZOS)
-                
-                # Convert to numpy array
-                image_array = np.array(img, dtype=np.float32)
-                
-                # Expand dimensions for batch processing
-                image_array = np.expand_dims(image_array, axis=0)
-                
-                # Preprocess for MobileNetV2
-                image_array = tf.keras.applications.mobilenet_v2.preprocess_input(image_array)
-                
-                return image_array
-                
+                # Method 2: Read as bytes first, then open
+                try:
+                    with open(image_path, 'rb') as f:
+                        img = Image.open(f)
+                        img.load()  # Force load the image data
+                        return self._process_image(img)
+                except Exception as e2:
+                    logger.warning(f"Byte reading failed for {image_path}: {e2}")
+                    
+                    # Method 3: Use OpenCV then convert to PIL
+                    try:
+                        # OpenCV can often handle problematic paths better
+                        cv_image = cv2.imdecode(np.fromfile(image_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+                        if cv_image is not None:
+                            # Convert BGR to RGB
+                            rgb_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
+                            img = Image.fromarray(rgb_image)
+                            return self._process_image(img)
+                    except Exception as e3:
+                        logger.error(f"All image loading methods failed for {image_path}: {e3}")
+                        return None
+                        
         except Exception as e:
             logger.error(f"💥 Failed to load/preprocess image {image_path}: {e}")
             return None
+    
+    def _process_image(self, img: Image.Image) -> np.ndarray:
+        """Process a PIL image into model input format."""
+        # Convert to RGB if needed
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+        
+        # Resize to model input size
+        img = img.resize(self.input_size, Image.Resampling.LANCZOS)
+        
+        # Convert to numpy array
+        image_array = np.array(img, dtype=np.float32)
+        
+        # Expand dimensions for batch processing
+        image_array = np.expand_dims(image_array, axis=0)
+        
+        # Preprocess for MobileNetV2
+        image_array = tf.keras.applications.mobilenet_v2.preprocess_input(image_array)
+        
+        return image_array
     
     def _clean_label(self, label: str) -> str:
         """
