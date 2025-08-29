@@ -1,8 +1,7 @@
 # Core dependencies
-opencv-python
+opencv-python>=4.8.0
 pillow
 pytesseract
-face_recognition
 numpy
 tqdm
 
@@ -11,8 +10,14 @@ tensorflow>=2.12.0
 imagehash
 requests
 
-# Note: face_recognition requires dlib, which can be tricky on Windows
-# If you have installation issues:
+# Modern Face Detection (highly recommended)
+mediapipe>=0.10.0
+
+# Optional Advanced Face Recognition (can be tricky to install)
+# face_recognition
+# dlib
+
+# If face_recognition installation fails:
 # 1. Install Visual Studio Build Tools or Visual Studio Community
 # 2. Install CMake: https://cmake.org/download/
 # 3. pip install dlib
