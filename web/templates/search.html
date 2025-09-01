@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Search Photos - PicSortinator 3000</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔍</text></svg>">
+    <style>
+        .search-box {
+            position: relative;
+            margin-bottom: 2rem;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 1rem 3rem 1rem 1rem;
+            font-size: 1.2rem;
+            border: 2px solid #ddd;
+            border-radius: 50px;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .search-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 0.8rem;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .search-btn:hover {
+            transform: translateY(-50%) scale(1.1);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .search-suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .suggestion-tag {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            font-size: 0.9rem;
+        }
+
+        .suggestion-tag:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(240, 147, 251, 0.4);
+        }
+
+        .filters {
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 15px;
+            padding: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .filter-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .filter-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .filter-group label {
+            font-weight: 600;
+            color: #333;
+            margin-right: 0.5rem;
+        }
+
+        .filter-select {
+            padding: 0.5rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            transition: all 0.3s ease;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.2);
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .results-count {
+            font-size: 1.1rem;
+            color: #666;
+        }
+
+        .view-toggle {
+            display: flex;
+            gap: 0rem;
+        }
+
+        .view-btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid #ddd;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .view-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+        }
+
+        .view-btn:first-child {
+            border-radius: 8px 0 0 8px;
+        }
+
+        .view-btn:last-child {
+            border-radius: 0 8px 8px 0;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+
+        .results-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .result-item {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .result-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .result-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+
+        .result-info {
+            padding: 1rem;
+        }
+
+        .result-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #333;
+        }
+
+        .result-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .result-tag {
+            background: #f0f0f0;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .result-meta {
+            font-size: 0.9rem;
+            color: #888;
+        }
+
+        .list-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .list-item .result-image {
+            width: 150px;
+            height: 100px;
+            flex-shrink: 0;
+        }
+
+        .list-item .result-info {
+            flex: 1;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+
+        .no-results h3 {
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+
+        .modal-content {
+            position: relative;
+            background-color: white;
+            margin: 5% auto;
+            padding: 2rem;
+            width: 90%;
+            max-width: 800px;
+            border-radius: 15px;
+            animation: modalOpen 0.3s ease;
+        }
+
+        @keyframes modalOpen {
+            from {
+                opacity: 0;
+                transform: scale(0.7);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .close {
+            position: absolute;
+            right: 1rem;
+            top: 1rem;
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .modal-image {
+            width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- 🎭 Floating Emojis -->
+    <div class="floating-emoji">🔍</div>
+    <div class="floating-emoji">📸</div>
+    <div class="floating-emoji">✨</div>
+    <div class="floating-emoji">🎨</div>
+
+    <!-- 🏠 Header -->
+    <header class="header">
+        <div class="container">
+            <h1>🔍 Find Your Perfect Photos!</h1>
+            <p>✨ Search through your collection with AI-powered magic! ✨</p>
+        </div>
+    </header>
+
+    <!-- 🧭 Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="{{ url_for('index') }}" class="nav-link">🏠 Home</a>
+            <a href="{{ url_for('upload') }}" class="nav-link">📤 Upload</a>
+            <a href="{{ url_for('gallery') }}" class="nav-link">🖼️ Gallery</a>
+            <a href="{{ url_for('search') }}" class="nav-link" style="background: var(--bg-gradient); color: white;">🔍 Search</a>
+        </div>
+    </nav>
+
+    <!-- 🔍 Main Search Container -->
+    <main class="container">
+        <div class="card">
+            <div class="search-box">
+                <input type="text" id="searchInput" class="search-input" placeholder="Search your photos... Try 'cat', 'outdoors', 'faces', or any tag!">
+                <button onclick="performSearch()" class="search-btn">
+                    <span style="font-size: 1.2rem;">🔍</span>
+                </button>
+            </div>
+
+            <div class="search-suggestions">
+                <button class="suggestion-tag" onclick="quickSearch('people')">👥 People</button>
+                <button class="suggestion-tag" onclick="quickSearch('animals')">🐕 Animals</button>
+                <button class="suggestion-tag" onclick="quickSearch('nature')">🌳 Nature</button>
+                <button class="suggestion-tag" onclick="quickSearch('food')">🍕 Food</button>
+                <button class="suggestion-tag" onclick="quickSearch('vehicles')">🚗 Vehicles</button>
+                <button class="suggestion-tag" onclick="quickSearch('buildings')">🏢 Buildings</button>
+                <button class="suggestion-tag" onclick="quickSearch('text')">📝 Text</button>
+                <button class="suggestion-tag" onclick="quickSearch('faces')">😊 Faces</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="filters">
+            <div class="filter-group">
+                <label>Sort by:</label>
+                <select id="sortBy" class="filter-select">
+                    <option value="date_desc">Newest First</option>
+                    <option value="date_asc">Oldest First</option>
+                    <option value="name_asc">Name A-Z</option>
+                    <option value="name_desc">Name Z-A</option>
+                    <option value="size_desc">Largest First</option>
+                    <option value="size_asc">Smallest First</option>
+                </select>
+
+                <label>Has faces:</label>
+                <select id="hasFaces" class="filter-select">
+                    <option value="">Any</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                </select>
+
+                <label>Has text:</label>
+                <select id="hasText" class="filter-select">
+                    <option value="">Any</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                </select>
+            </div>
+        </div>
+        </div>
+
+        <div class="card">
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Searching through your photo collection...</p>
+            </div>
+
+            <div class="search-results" id="searchResults" style="display: none;">
+                <div class="results-header">
+                    <div class="results-count" id="resultsCount">0 photos found</div>
+                    <div class="view-toggle">
+                        <button class="view-btn active" onclick="switchView('grid')">Grid</button>
+                        <button class="view-btn" onclick="switchView('list')">List</button>
+                    </div>
+                </div>
+                <div class="results-grid" id="resultsContainer"></div>
+            </div>
+
+            <div class="no-results" id="noResults" style="display: none;">
+                <h3>🔍 No photos found</h3>
+                <p>Try searching for different terms like 'cat', 'outdoors', 'people', or 'food'.</p>
+                <p>Or browse all your photos in the <a href="/gallery">Gallery</a>!</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Image Modal -->
+    <div id="imageModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <img id="modalImage" class="modal-image" src="" alt="">
+            <div id="modalInfo">
+                <h3 id="modalTitle"></h3>
+                <div id="modalTags" class="result-tags"></div>
+                <div id="modalMeta" class="result-meta"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentView = 'grid';
+        let currentResults = [];
+
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+
+        function quickSearch(term) {
+            document.getElementById('searchInput').value = term;
+            performSearch();
+        }
+
+        function performSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            const sortBy = document.getElementById('sortBy').value;
+            const hasFaces = document.getElementById('hasFaces').value;
+            const hasText = document.getElementById('hasText').value;
+
+            if (!query && !hasFaces && !hasText) {
+                alert('Please enter a search term or select a filter!');
+                return;
+            }
+
+            showLoading(true);
+
+            const params = new URLSearchParams({
+                q: query,
+                sort: sortBy,
+                has_faces: hasFaces,
+                has_text: hasText
+            });
+
+            fetch(`/api/search?${params}`)
+                .then(response => response.json())
+                .then(data => {
+                    currentResults = data.results || [];
+                    displayResults(currentResults);
+                    showLoading(false);
+                })
+                .catch(error => {
+                    console.error('Search error:', error);
+                    showLoading(false);
+                    alert('Error performing search. Please try again.');
+                });
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+            document.getElementById('searchResults').style.display = show ? 'none' : 'block';
+            document.getElementById('noResults').style.display = 'none';
+        }
+
+        function displayResults(results) {
+            const container = document.getElementById('resultsContainer');
+            const resultsCount = document.getElementById('resultsCount');
+            const searchResults = document.getElementById('searchResults');
+            const noResults = document.getElementById('noResults');
+
+            if (results.length === 0) {
+                searchResults.style.display = 'none';
+                noResults.style.display = 'block';
+                return;
+            }
+
+            searchResults.style.display = 'block';
+            noResults.style.display = 'none';
+            
+            resultsCount.textContent = `${results.length} photo${results.length !== 1 ? 's' : ''} found`;
+
+            container.innerHTML = '';
+            container.className = currentView === 'grid' ? 'results-grid' : 'results-list';
+
+            results.forEach(result => {
+                const item = createResultItem(result);
+                container.appendChild(item);
+            });
+        }
+
+        function createResultItem(result) {
+            const item = document.createElement('div');
+            item.className = `result-item ${currentView === 'list' ? 'list-item' : ''}`;
+            item.onclick = () => openModal(result);
+
+            const tags = (result.tags || '').split(',').filter(tag => tag.trim());
+            const tagsHtml = tags.slice(0, 5).map(tag => 
+                `<span class="result-tag">${tag.trim()}</span>`
+            ).join('');
+
+            const moreTagsText = tags.length > 5 ? ` +${tags.length - 5} more` : '';
+
+            item.innerHTML = `
+                <img src="/image/${result.id}" alt="${result.filename}" class="result-image" loading="lazy">
+                <div class="result-info">
+                    <div class="result-title">${result.filename}</div>
+                    <div class="result-tags">
+                        ${tagsHtml}
+                        ${moreTagsText ? `<span class="result-tag">${moreTagsText}</span>` : ''}
+                    </div>
+                    <div class="result-meta">
+                        ${new Date(result.processed_date).toLocaleDateString()}
+                        ${result.face_count > 0 ? ` • ${result.face_count} face${result.face_count !== 1 ? 's' : ''}` : ''}
+                        ${result.text_content ? ' • Contains text' : ''}
+                    </div>
+                </div>
+            `;
+
+            return item;
+        }
+
+        function switchView(view) {
+            currentView = view;
+            
+            // Update button states
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Re-display results with new view
+            displayResults(currentResults);
+        }
+
+        // Modal functionality
+        function openModal(result) {
+            const modal = document.getElementById('imageModal');
+            const modalImage = document.getElementById('modalImage');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalTags = document.getElementById('modalTags');
+            const modalMeta = document.getElementById('modalMeta');
+
+            modalImage.src = `/image/${result.id}`;
+            modalTitle.textContent = result.filename;
+
+            const tags = (result.tags || '').split(',').filter(tag => tag.trim());
+            modalTags.innerHTML = tags.map(tag => 
+                `<span class="result-tag">${tag.trim()}</span>`
+            ).join('');
+
+            modalMeta.innerHTML = `
+                <strong>Date:</strong> ${new Date(result.processed_date).toLocaleString()}<br>
+                <strong>File Size:</strong> ${formatFileSize(result.file_size)}<br>
+                ${result.face_count > 0 ? `<strong>Faces:</strong> ${result.face_count}<br>` : ''}
+                ${result.text_content ? `<strong>Text Content:</strong> ${result.text_content.substring(0, 200)}...` : ''}
+            `;
+
+            modal.style.display = 'block';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Close modal
+        document.querySelector('.close').onclick = function() {
+            document.getElementById('imageModal').style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('imageModal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Auto-search on filter change
+        document.getElementById('sortBy').addEventListener('change', function() {
+            if (currentResults.length > 0) {
+                performSearch();
+            }
+        });
+
+        document.getElementById('hasFaces').addEventListener('change', function() {
+            if (currentResults.length > 0 || this.value) {
+                performSearch();
+            }
+        });
+
+        document.getElementById('hasText').addEventListener('change', function() {
+            if (currentResults.length > 0 || this.value) {
+                performSearch();
+            }
+        });
+
+        // Initialize with recent photos
+        window.addEventListener('load', function() {
+            // Load some recent photos as default
+            document.getElementById('sortBy').value = 'date_desc';
+            // Load default photos without triggering validation
+            showLoading(true);
+            fetch('/api/search?sort=date_desc')
+                .then(response => response.json())
+                .then(data => {
+                    currentResults = data.results || [];
+                    displayResults(currentResults);
+                    showLoading(false);
+                })
+                .catch(error => {
+                    console.error('Default load error:', error);
+                    showLoading(false);
+                });
+        });
+        
+        // 🎉 Easter Egg for curious developers
+        console.log('🔍 Search page loaded! Our AI is ready to find your photos in a flash! ⚡');
+        console.log('🥚 Pro Tip: Try searching for "selfie" or "sunset" for some amazing results!');
+    </script>
+</body>
+</html>

@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🖼️ Gallery - PicSortinator 3000</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🖼️</text></svg>">
+</head>
+<body>
+    <!-- 🎭 Floating Emojis -->
+    <div class="floating-emoji">🖼️</div>
+    <div class="floating-emoji">🎨</div>
+    <div class="floating-emoji">📸</div>
+    <div class="floating-emoji">✨</div>
+
+    <!-- 🏠 Header -->
+    <header class="header">
+        <div class="container">
+            <h1>🖼️ Your Beautiful Gallery</h1>
+            <p>✨ {{ images|length }} amazing photos organized by AI! ✨</p>
+        </div>
+    </header>
+
+    <!-- 🧭 Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="{{ url_for('index') }}" class="nav-link">🏠 Home</a>
+            <a href="{{ url_for('upload') }}" class="nav-link">📤 Upload</a>
+            <a href="{{ url_for('gallery') }}" class="nav-link" style="background: var(--bg-gradient); color: white;">🖼️ Gallery</a>
+            <a href="{{ url_for('search') }}" class="nav-link">🔍 Search</a>
+        </div>
+    </nav>
+
+    <!-- 🖼️ Gallery Content -->
+    <main class="container">
+        {% if images %}
+            <!-- 🎛️ Gallery Controls -->
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <h2>🎨 Your Photo Collection</h2>
+                    <div style="display: flex; gap: 1rem; align-items: center;">
+                        <select id="sortBy" class="btn btn-secondary" style="padding: 0.5rem;">
+                            <option value="newest">📅 Newest First</option>
+                            <option value="oldest">🕐 Oldest First</option>
+                            <option value="faces">👥 Most Faces</option>
+                            <option value="tags">🏷️ Most Tags</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="toggleView();">
+                            <span id="viewToggle">📏 Grid View</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 📊 Quick Stats -->
+            <div class="card">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number">{{ images|length }}</div>
+                        <div class="stat-label">📸 Photos Shown</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">{{ images|selectattr('faces', 'greaterthan', 0)|list|length }}</div>
+                        <div class="stat-label">👥 With People</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">{{ images|selectattr('has_text')|list|length }}</div>
+                        <div class="stat-label">📄 With Text</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">{{ images|map(attribute='tags')|sum(start=[])|unique|list|length }}</div>
+                        <div class="stat-label">🏷️ Unique Tags</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🖼️ Image Gallery Grid -->
+            <div class="gallery-grid" id="galleryGrid">
+                {% for image in images %}
+                <div class="image-card" data-faces="{{ image.faces }}" data-tags="{{ image.tags|length }}" data-date="{{ image.created_at }}">
+                    <img src="/image/{{ image.id }}" 
+                         alt="{{ image.filename }}" 
+                         loading="lazy"
+                         onclick="openImageModal('{{ image.filename }}', {{ image.tags|tojson }}, {{ image.faces }}, {{ image.has_text|tojson }})">
+                    
+                    <div class="image-info">
+                        <div class="image-filename" title="{{ image.filename }}">
+                            {{ image.filename }}
+                        </div>
+                        
+                        {% if image.tags %}
+                        <div class="image-tags">
+                            {% for tag in image.tags[:3] %}
+                            <span class="tag">{{ tag }}</span>
+                            {% endfor %}
+                            {% if image.tags|length > 3 %}
+                            <span class="tag" style="background: var(--text-secondary);">+{{ image.tags|length - 3 }}</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        <div class="image-meta">
+                            <div>
+                                {% if image.faces > 0 %}
+                                <span class="meta-badge">👥 {{ image.faces }}</span>
+                                {% endif %}
+                                {% if image.has_text %}
+                                <span class="meta-badge">📄 Text</span>
+                                {% endif %}
+                            </div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary);">
+                                {{ image.created_at[:10] if image.created_at else 'Unknown' }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- 📖 Pagination -->
+            {% if page > 1 or images|length == 24 %}
+            <div class="card" style="text-align: center;">
+                <div style="display: flex; justify-content: center; gap: 1rem; align-items: center;">
+                    {% if page > 1 %}
+                    <a href="{{ url_for('gallery', page=page-1) }}" class="btn btn-secondary">
+                        ⬅️ Previous
+                    </a>
+                    {% endif %}
+                    
+                    <span style="font-weight: 600; color: var(--text-primary);">
+                        Page {{ page }}
+                    </span>
+                    
+                    {% if images|length == 24 %}
+                    <a href="{{ url_for('gallery', page=page+1) }}" class="btn btn-secondary">
+                        Next ➡️
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+        {% else %}
+            <!-- 😔 Empty State -->
+            <div class="card" style="text-align: center; padding: 4rem 2rem;">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">📸</div>
+                <h2>No Photos Yet!</h2>
+                <p style="color: var(--text-secondary); margin: 1rem 0;">
+                    Your gallery is waiting for some beautiful photos to organize! ✨
+                </p>
+                <a href="{{ url_for('upload') }}" class="btn btn-primary">
+                    📤 Upload Your First Photos
+                </a>
+            </div>
+        {% endif %}
+    </main>
+
+    <!-- 🔍 Image Modal -->
+    <div id="imageModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeImageModal()">&times;</span>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <!-- ✨ JavaScript Magic -->
+    <script>
+        let currentView = 'grid';
+
+        // 🎛️ Sort Functionality
+        document.getElementById('sortBy').addEventListener('change', function() {
+            const sortBy = this.value;
+            const cards = Array.from(document.querySelectorAll('.image-card'));
+            
+            cards.sort((a, b) => {
+                switch(sortBy) {
+                    case 'newest':
+                        return new Date(b.dataset.date) - new Date(a.dataset.date);
+                    case 'oldest':
+                        return new Date(a.dataset.date) - new Date(b.dataset.date);
+                    case 'faces':
+                        return parseInt(b.dataset.faces) - parseInt(a.dataset.faces);
+                    case 'tags':
+                        return parseInt(b.dataset.tags) - parseInt(a.dataset.tags);
+                    default:
+                        return 0;
+                }
+            });
+            
+            const grid = document.getElementById('galleryGrid');
+            cards.forEach(card => {
+                grid.appendChild(card);
+                card.style.animation = 'slideIn 0.3s ease';
+            });
+        });
+
+        // 👀 Toggle View
+        function toggleView() {
+            const grid = document.getElementById('galleryGrid');
+            const toggle = document.getElementById('viewToggle');
+            
+            if (currentView === 'grid') {
+                grid.style.gridTemplateColumns = '1fr';
+                grid.style.gap = '1rem';
+                toggle.textContent = '📐 List View';
+                currentView = 'list';
+                
+                // Modify cards for list view
+                document.querySelectorAll('.image-card').forEach(card => {
+                    card.style.display = 'flex';
+                    card.style.alignItems = 'center';
+                    const img = card.querySelector('img');
+                    img.style.width = '100px';
+                    img.style.height = '100px';
+                    img.style.flexShrink = '0';
+                });
+            } else {
+                grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(300px, 1fr))';
+                grid.style.gap = '1.5rem';
+                toggle.textContent = '📏 Grid View';
+                currentView = 'grid';
+                
+                // Reset cards for grid view
+                document.querySelectorAll('.image-card').forEach(card => {
+                    card.style.display = 'block';
+                    const img = card.querySelector('img');
+                    img.style.width = '100%';
+                    img.style.height = '200px';
+                });
+            }
+        }
+
+        // 🖼️ Image Modal
+        function openImageModal(filename, tags, faces, hasText) {
+            const modal = document.getElementById('imageModal');
+            const content = document.getElementById('modalContent');
+            
+            content.innerHTML = `
+                <div style="text-align: center;">
+                    <h2 style="margin-bottom: 1rem;">🖼️ ${filename}</h2>
+                    <div style="margin-bottom: 1rem;">
+                        <img src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 400'><rect width='600' height='400' fill='%23f3f4f6'/><text x='50%' y='50%' text-anchor='middle' dominant-baseline='middle' fill='%236b7280' font-family='Inter, sans-serif' font-size='20'>🖼️ ${filename}</text></svg>" 
+                             style="max-width: 100%; max-height: 70vh; border-radius: 8px; box-shadow: var(--shadow-medium);">
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; text-align: left;">
+                        <div>
+                            <h3>🏷️ Tags</h3>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.5rem;">
+                                ${tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                            </div>
+                        </div>
+                        <div>
+                            <h3>📊 Details</h3>
+                            <div style="margin-top: 0.5rem;">
+                                <div>👥 Faces: ${faces}</div>
+                                <div>📄 Contains Text: ${hasText ? 'Yes' : 'No'}</div>
+                                <div>🏷️ Total Tags: ${tags.length}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeImageModal() {
+            document.getElementById('imageModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        // 🎊 Page Load Animation
+        document.addEventListener('DOMContentLoaded', function() {
+            const cards = document.querySelectorAll('.image-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'scale(0.8)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.5s ease';
+                    card.style.opacity = '1';
+                    card.style.transform = 'scale(1)';
+                }, index * 50);
+            });
+        });
+
+        // 🌈 Console Easter Egg
+        console.log('🖼️ Gallery loaded! Look at all these beautiful photos! ✨');
+        console.log('🎭 Fun fact: Our AI can now tell the difference between people and curry! 🍛➡️👤❌');
+        console.log('🥚 Easter Egg: Did you know this gallery can display over 10,000 photos without breaking a sweat? 📸💪');
+    </script>
+
+    <!-- 🎨 Modal Styles -->
+    <style>
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal-content {
+            background: var(--bg-primary);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            animation: slideIn 0.3s ease;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            font-size: 2rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: color 0.3s ease;
+        }
+
+        .modal-close:hover {
+            color: var(--error-color);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</body>
+</html>

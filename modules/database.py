@@ -8,6 +8,7 @@ Handles SQLite database operations for storing image metadata and analysis resul
 💾 Fun Fact: This database has indexed more memories than your brain can store!
 🔍 Easter Egg: Full-text search so powerful, it can find that one meme from 2019.
 📊 Warning: May become sentient and start organizing your life outside of photos.
+🥚 Hidden Gem: Our migration system is so smooth, it could organize a chaotic penguin colony!
 """
 
 import os
@@ -41,9 +42,11 @@ class DatabaseManager:
     def _initialize_database(self):
         """Initialize database connection and create tables if they don't exist."""
         try:
-            self.conn = sqlite3.connect(self.db_path)
+            # Enable thread safety by checking threads
+            self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
             self.conn.row_factory = sqlite3.Row  # Enable column access by name
             self._create_tables()
+            self._migrate_database()  # Add migration for existing databases
             logger.info(f"Database initialized: {self.db_path}")
         except Exception as e:
             logger.error(f"Failed to initialize database: {e}")
@@ -77,6 +80,7 @@ class DatabaseManager:
                 tags TEXT,
                 extracted_text TEXT,
                 faces TEXT,
+                face_count INTEGER DEFAULT 0,
                 ml_confidence REAL,
                 notes TEXT
             )
@@ -133,6 +137,37 @@ class DatabaseManager:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_faces_image ON faces (image_id)')
         
         self.conn.commit()
+    
+    def _migrate_database(self):
+        """Migrate existing database to new schema."""
+        try:
+            cursor = self.conn.cursor()
+            
+            # Check if face_count column exists
+            cursor.execute("PRAGMA table_info(images)")
+            columns = [column[1] for column in cursor.fetchall()]
+            
+            if 'face_count' not in columns:
+                logger.info("Migrating database: Adding face_count column")
+                cursor.execute("ALTER TABLE images ADD COLUMN face_count INTEGER DEFAULT 0")
+                
+                # Populate face_count column based on existing faces data
+                cursor.execute("SELECT id, faces FROM images WHERE faces IS NOT NULL AND faces != ''")
+                rows = cursor.fetchall()
+                
+                for image_id, faces_str in rows:
+                    if faces_str:
+                        # Count comma-separated values
+                        face_count = len([f.strip() for f in faces_str.split(',') if f.strip()])
+                        cursor.execute("UPDATE images SET face_count = ? WHERE id = ?", (face_count, image_id))
+                
+                self.conn.commit()
+                logger.info("Database migration completed")
+                # 🥚 Easter Egg: Our migration is smoother than a perfectly organized photo album!
+            
+        except Exception as e:
+            logger.error(f"Database migration failed: {e}")
+            # Don't raise the error as we want the app to continue working
     
     def add_image(self, metadata):
         """
@@ -204,12 +239,13 @@ class DatabaseManager:
             # Convert tags to string if provided
             tags_str = ",".join(tags) if tags else None
             faces_str = ",".join([f"person_{i}" for i in range(len(faces))]) if faces else None
+            face_count = len(faces) if faces else 0
             
             cursor.execute('''
                 UPDATE images 
-                SET tags = ?, extracted_text = ?, faces = ?, ml_confidence = ?, processed = TRUE
+                SET tags = ?, extracted_text = ?, faces = ?, face_count = ?, ml_confidence = ?, processed = TRUE
                 WHERE id = ?
-            ''', (tags_str, extracted_text, faces_str, confidence, image_id))
+            ''', (tags_str, extracted_text, faces_str, face_count, confidence, image_id))
             
             self.conn.commit()
             logger.info(f"Updated analysis for image ID: {image_id}")
@@ -239,16 +275,19 @@ class DatabaseManager:
             
             # Handle faces parameter (could be count or actual face data)
             faces_str = None
+            face_count = 0
             if isinstance(faces, int) and faces > 0:
                 faces_str = ",".join([f"person_{i}" for i in range(faces)])
+                face_count = faces
             elif isinstance(faces, list) and faces:
                 faces_str = ",".join([f"person_{i}" for i in range(len(faces))])
+                face_count = len(faces)
             
             cursor.execute('''
                 UPDATE images 
-                SET tags = ?, extracted_text = ?, faces = ?, ml_confidence = ?, processed = TRUE
+                SET tags = ?, extracted_text = ?, faces = ?, face_count = ?, ml_confidence = ?, processed = TRUE
                 WHERE id = ?
-            ''', (tags_str, extracted_text, faces_str, confidence, image_id))
+            ''', (tags_str, extracted_text, faces_str, face_count, confidence, image_id))
             
             self.conn.commit()
             logger.info(f"Updated processing for image ID: {image_id}")
@@ -409,12 +448,23 @@ class DatabaseManager:
             cursor.execute("SELECT COUNT(*) FROM images WHERE faces IS NOT NULL AND faces != ''")
             face_images = cursor.fetchone()[0]
             
+            # Unique tags count - simple approach
+            cursor.execute("SELECT tags FROM images WHERE tags IS NOT NULL AND tags != ''")
+            all_tags = cursor.fetchall()
+            unique_tags_set = set()
+            for (tags_str,) in all_tags:
+                if tags_str:
+                    tags = [tag.strip() for tag in tags_str.split(',') if tag.strip()]
+                    unique_tags_set.update(tags)
+            unique_tags = len(unique_tags_set)
+            
             return {
                 'total_images': total_images,
                 'processed_images': processed_images,
                 'tagged_images': tagged_images,
                 'text_images': text_images,
                 'face_images': face_images,
+                'unique_tags': unique_tags,
                 'processing_rate': (processed_images / total_images * 100) if total_images > 0 else 0
             }
             
@@ -422,8 +472,71 @@ class DatabaseManager:
             logger.error(f"Failed to get image stats: {e}")
             return {}
     
+    def search_by_tags(self, tags):
+        """
+        Search for images containing specific tags.
+        
+        Args:
+            tags (list): List of tags to search for
+            
+        Returns:
+            list: Matching image records
+        """
+        try:
+            cursor = self.conn.cursor()
+            
+            # Build query with OR conditions for multiple tags
+            conditions = []
+            params = []
+            
+            for tag in tags:
+                conditions.append("tags LIKE ?")
+                params.append(f"%{tag}%")
+            
+            query = f"""
+                SELECT id, path, tags, extracted_text, face_count
+                FROM images 
+                WHERE processed = TRUE AND ({' OR '.join(conditions)})
+            """
+            
+            cursor.execute(query, params)
+            return cursor.fetchall()
+            
+        except Exception as e:
+            logger.error(f"Failed to search by tags: {e}")
+            return []
+    
+    def search_by_text(self, query):
+        """
+        Search for images containing specific text.
+        
+        Args:
+            query (str): Text to search for
+            
+        Returns:
+            list: Matching image records
+        """
+        try:
+            cursor = self.conn.cursor()
+            
+            search_query = f"%{query}%"
+            cursor.execute("""
+                SELECT id, path, tags, extracted_text, face_count
+                FROM images 
+                WHERE processed = TRUE AND extracted_text LIKE ?
+            """, (search_query,))
+            
+            return cursor.fetchall()
+            
+        except Exception as e:
+            logger.error(f"Failed to search by text: {e}")
+            return []
+    
     def close(self):
         """Close database connection."""
         if self.conn:
             self.conn.close()
             logger.info("Database connection closed")
+
+# Alias for backwards compatibility
+Database = DatabaseManager

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎆 PicSortinator 3000 - Home</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎆</text></svg>">
+</head>
+<body>
+    <!-- 🎭 Floating Emojis for Fun -->
+    <div class="floating-emoji">📸</div>
+    <div class="floating-emoji">🎨</div>
+    <div class="floating-emoji">✨</div>
+    <div class="floating-emoji">🌈</div>
+
+    <!-- 🏠 Header Section -->
+    <header class="header">
+        <div class="container">
+            <h1 class="rainbow-text">🎆 PicSortinator 3000</h1>
+            <p>{{ cute_message }}</p>
+        </div>
+    </header>
+
+    <!-- 🧭 Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="{{ url_for('index') }}" class="nav-link">🏠 Home</a>
+            <a href="{{ url_for('upload') }}" class="nav-link">📤 Upload</a>
+            <a href="{{ url_for('gallery') }}" class="nav-link">🖼️ Gallery</a>
+            <a href="{{ url_for('search') }}" class="nav-link">🔍 Search</a>
+        </div>
+    </nav>
+
+    <!-- 📊 Main Content -->
+    <main class="container">
+        <!-- 📊 Statistics Dashboard -->
+        <div class="card">
+            <h2>📊 Your Photo Collection Dashboard</h2>
+            <div class="stats-grid">
+                <div class="stat-card wobble">
+                    <div class="stat-number">{{ stats.total_images or 0 }}</div>
+                    <div class="stat-label">📸 Total Images</div>
+                </div>
+                <div class="stat-card wobble">
+                    <div class="stat-number">{{ stats.processed_images or 0 }}</div>
+                    <div class="stat-label">🤖 AI Analyzed</div>
+                </div>
+                <div class="stat-card wobble">
+                    <div class="stat-number">{{ stats.unique_tags or 0 }}</div>
+                    <div class="stat-label">🏷️ Unique Tags</div>
+                </div>
+                <div class="stat-card wobble">
+                    <div class="stat-number">{{ processing_stats.currently_processing or 0 }}</div>
+                    <div class="stat-label">⚡ Processing Now</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 🚀 Quick Actions -->
+        <div class="card">
+            <h2>🚀 Quick Actions</h2>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem;">
+                <a href="{{ url_for('upload') }}" class="btn btn-primary pulse">
+                    📤 Upload Photos
+                </a>
+                <a href="{{ url_for('gallery') }}" class="btn btn-secondary pulse">
+                    🖼️ Browse Gallery
+                </a>
+                <a href="{{ url_for('search') }}" class="btn btn-secondary pulse">
+                    🔍 Search Images
+                </a>
+            </div>
+        </div>
+
+        <!-- 📈 Recent Activity -->
+        {% if processing_stats.recent_uploads %}
+        <div class="card">
+            <h2>📈 Recent Activity</h2>
+            <div style="max-height: 300px; overflow-y: auto;">
+                {% for upload in processing_stats.recent_uploads %}
+                <div style="border-bottom: 1px solid #e5e7eb; padding: 1rem 0; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-weight: 600; color: var(--text-primary);">{{ upload.filename }}</div>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                            {% if upload.tags %}
+                                🏷️ {{ upload.tags[:3]|join(', ') }}
+                            {% endif %}
+                            {% if upload.faces > 0 %}
+                                👥 {{ upload.faces }} face(s)
+                            {% endif %}
+                            {% if upload.has_text %}
+                                📄 Contains text
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                        {{ upload.timestamp[:19] }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 🎯 Features Showcase -->
+        <div class="card">
+            <h2>🎯 What Makes Us Special</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 1.5rem;">
+                <div style="text-align: center; padding: 1.5rem;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">🧠</div>
+                    <h3>Smart AI Tagging</h3>
+                    <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                        Our AI can identify 1000+ different objects, scenes, and concepts in your photos!
+                    </p>
+                </div>
+                <div style="text-align: center; padding: 1.5rem;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">👥</div>
+                    <h3>Face Detection</h3>
+                    <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                        Find all photos with people automatically (no more faces in your curry photos!)
+                    </p>
+                </div>
+                <div style="text-align: center; padding: 1.5rem;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">📄</div>
+                    <h3>Text Extraction</h3>
+                    <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                        Make screenshots and documents searchable with OCR technology.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 💝 Made with Love -->
+        <div class="card" style="text-align: center; background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);">
+            <h2>💝 Made with Love</h2>
+            <p style="color: var(--text-secondary); margin-top: 1rem;">
+                PicSortinator 3000 is crafted with modern AI, lots of coffee ☕, and way too many emojis! 
+                <br>We hope it brings joy to organizing your digital memories! ✨
+            </p>
+            <div style="margin-top: 1.5rem; font-size: 0.9rem; color: var(--text-secondary);">
+                🎭 <em>Easter egg hunters: Check the source code for hidden jokes!</em>
+            </div>
+        </div>
+    </main>
+
+    <!-- ✨ JavaScript for Real-time Updates -->
+    <script>
+        // 🔄 Update stats every 5 seconds
+        function updateStats() {
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(data => {
+                    // Update stat numbers with cute animations
+                    const statNumbers = document.querySelectorAll('.stat-number');
+                    if (statNumbers[0]) statNumbers[0].textContent = data.total_images || 0;
+                    if (statNumbers[1]) statNumbers[1].textContent = data.processed_images || 0;
+                    if (statNumbers[2]) statNumbers[2].textContent = data.unique_tags || 0;
+                    if (statNumbers[3]) statNumbers[3].textContent = data.currently_processing || 0;
+                    
+                    // Add celebration animation if processing is active
+                    if (data.currently_processing > 0) {
+                        statNumbers[3].parentElement.classList.add('celebrate');
+                        setTimeout(() => {
+                            statNumbers[3].parentElement.classList.remove('celebrate');
+                        }, 800);
+                    }
+                })
+                .catch(error => console.log('Stats update failed (that\\'s okay! 😊):', error));
+        }
+
+        // 🚀 Start real-time updates
+        setInterval(updateStats, 5000);
+
+        // 🎊 Welcome animation
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add entrance animations
+            const cards = document.querySelectorAll('.card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.5s ease';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 100);
+            });
+
+            // 🎭 Add random wobbles to stat cards
+            setInterval(() => {
+                const statCards = document.querySelectorAll('.stat-card');
+                const randomCard = statCards[Math.floor(Math.random() * statCards.length)];
+                if (randomCard) {
+                    randomCard.classList.add('pulse');
+                    setTimeout(() => randomCard.classList.remove('pulse'), 1000);
+                }
+            }, 10000);
+        });
+
+        // 🌈 Console message for developers
+        console.log('🎆 Welcome to PicSortinator 3000! 🎆');
+        console.log('✨ Made with love, modern AI, and way too much caffeine!');
+        console.log('🎭 Found an easter egg? You\\'re in the secret developer society now!');
+        console.log('💝 Thanks for checking out our code - you\\'re awesome!');
+    </script>
+</body>
+</html>

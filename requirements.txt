@@ -5,6 +5,9 @@ pytesseract
 numpy
 tqdm
 
+# Web Interface
+flask>=2.3.0
+
 # ML and Processing
 tensorflow>=2.12.0
 imagehash

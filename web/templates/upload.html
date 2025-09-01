@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📤 Upload Photos - PicSortinator 3000</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📤</text></svg>">
+</head>
+<body>
+    <!-- 🎭 Floating Emojis -->
+    <div class="floating-emoji">📸</div>
+    <div class="floating-emoji">⚡</div>
+    <div class="floating-emoji">🎨</div>
+    <div class="floating-emoji">✨</div>
+
+    <!-- 🏠 Header -->
+    <header class="header">
+        <div class="container">
+            <h1>📤 Upload Your Amazing Photos!</h1>
+            <p>✨ Drop your images and watch our AI work its magic! ✨</p>
+        </div>
+    </header>
+
+    <!-- 🧭 Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="{{ url_for('index') }}" class="nav-link">🏠 Home</a>
+            <a href="{{ url_for('upload') }}" class="nav-link" style="background: var(--bg-gradient); color: white;">📤 Upload</a>
+            <a href="{{ url_for('gallery') }}" class="nav-link">🖼️ Gallery</a>
+            <a href="{{ url_for('search') }}" class="nav-link">🔍 Search</a>
+        </div>
+    </nav>
+
+    <!-- 📤 Upload Section -->
+    <main class="container">
+        <!-- 🎯 Upload Instructions -->
+        <div class="card">
+            <h2>🎯 How to Upload</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
+                <div style="text-align: center;">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">🖱️</div>
+                    <h3>Drag & Drop</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                        Simply drag your photos from your computer and drop them in the upload zone below!
+                    </p>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">📁</div>
+                    <h3>Browse Files</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                        Click the upload zone to open a file browser and select multiple images at once!
+                    </p>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">🤖</div>
+                    <h3>AI Magic</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                        Our AI will automatically tag, analyze faces, and extract text from your photos!
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 📤 Upload Zone -->
+        <div class="card">
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="upload-zone" id="uploadZone">
+                    <div class="upload-icon">📸</div>
+                    <h3>Drop your photos here or click to browse!</h3>
+                    <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                        Supports: JPG, PNG, GIF, BMP, TIFF, WebP (Max 16MB each)
+                    </p>
+                    <input type="file" id="fileInput" name="files[]" multiple accept="image/*" style="display: none;">
+                    <div style="margin-top: 1rem;">
+                        <button type="button" class="btn btn-primary" onclick="handleBrowseClick();">
+                            📁 Browse Files
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- 📊 Upload Progress -->
+        <div id="uploadProgress" class="card" style="display: none;">
+            <h2>🚀 Upload Progress</h2>
+            <div id="progressContainer"></div>
+        </div>
+
+        <!-- ✅ Upload Results -->
+        <div id="uploadResults" class="card" style="display: none;">
+            <h2>✅ Upload Complete!</h2>
+            <div id="resultsContainer"></div>
+            <div style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+                <a href="{{ url_for('gallery') }}" class="btn btn-primary">
+                    🖼️ View in Gallery
+                </a>
+                <button type="button" class="btn btn-secondary" onclick="resetUpload();">
+                    📤 Upload More
+                </button>
+            </div>
+        </div>
+
+        <!-- 🎭 Fun Facts -->
+        <div class="card" style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);">
+            <h2>🎭 Fun Facts About Our AI</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
+                <div>
+                    <h3>🧠 Smart Recognition</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                        Our AI can recognize over 1000 different objects, from "laptop" to "golden retriever" to "chocolate cake"!
+                    </p>
+                </div>
+                <div>
+                    <h3>👥 Face Detection</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                        We use modern deep learning models that won't mistake your dinner for a person (learned that the hard way! 🍛)
+                    </p>
+                </div>
+                <div>
+                    <h3>📄 Text Reading</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                        Screenshots, documents, signs - if there's text in your image, we'll find it and make it searchable!
+                    </p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ✨ JavaScript Magic -->
+    <script>
+        // 🎨 Upload Zone Elements
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const uploadForm = document.getElementById('uploadForm');
+        const uploadProgress = document.getElementById('uploadProgress');
+        const uploadResults = document.getElementById('uploadResults');
+
+        // 🎭 Drag and Drop Handlers
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('drag-over');
+            uploadZone.innerHTML = `
+                <div class="upload-icon" style="animation: bounce 0.5s ease infinite;">🎯</div>
+                <h3>Drop them right here! ✨</h3>
+                <p style="color: var(--success-color);">Your photos are about to get organized!</p>
+            `;
+        });
+
+        uploadZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('drag-over');
+            resetUploadZone();
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('drag-over');
+            
+            const files = Array.from(e.dataTransfer.files);
+            if (files.length > 0) {
+                handleFiles(files);
+            }
+            resetUploadZone();
+        });
+
+        // 🎯 Also attach direct listener to initial file input
+        const initialFileInput = document.getElementById('fileInput');
+        if (initialFileInput) {
+            initialFileInput.addEventListener('change', (e) => {
+                const files = Array.from(e.target.files);
+                console.log('📁 Files selected via direct listener:', files.length);
+                if (files.length > 0) {
+                    handleFiles(files);
+                }
+            });
+            console.log('✅ Direct file input listener attached');
+        }
+
+        // 🖱️ Handle Browse Button Click
+        function handleBrowseClick() {
+            console.log('🖱️ Browse button clicked!');
+            const fileInput = document.getElementById('fileInput');
+            if (fileInput) {
+                console.log('📂 File input found, triggering click...');
+                fileInput.click();
+                console.log('📂 File dialog should open now');
+            } else {
+                console.log('❌ File input not found!');
+                // Try to find it differently
+                const allInputs = document.querySelectorAll('input[type="file"]');
+                console.log('🔍 Found', allInputs.length, 'file inputs');
+                if (allInputs.length > 0) {
+                    allInputs[0].click();
+                    console.log('📂 Clicked first file input');
+                }
+            }
+        }
+
+        // 🎨 Reset Upload Zone
+        function resetUploadZone() {
+            uploadZone.innerHTML = `
+                <div class="upload-icon">📸</div>
+                <h3>Drop your photos here or click to browse!</h3>
+                <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                    Supports: JPG, PNG, GIF, BMP, TIFF, WebP (Max 16MB each)
+                </p>
+                <input type="file" id="fileInput" name="files[]" multiple accept="image/*" style="display: none;">
+                <div style="margin-top: 1rem;">
+                    <button type="button" class="btn btn-primary" onclick="handleBrowseClick();">
+                        📁 Browse Files
+                    </button>
+                </div>
+            `;
+            
+            // Re-attach event listener to the new file input
+            const newFileInput = document.getElementById('fileInput');
+            if (newFileInput) {
+                newFileInput.addEventListener('change', (e) => {
+                    const files = Array.from(e.target.files);
+                    console.log('📁 Files selected via reset listener:', files.length);
+                    if (files.length > 0) {
+                        handleFiles(files);
+                    }
+                });
+            }
+        }
+
+        // 🚀 Handle File Upload
+        function handleFiles(files) {
+            console.log('📁 handleFiles called with:', files.length, 'files');
+            
+            // Filter valid image files
+            const validFiles = files.filter(file => {
+                const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/tiff', 'image/webp'];
+                console.log('🔍 Checking file:', file.name, 'type:', file.type);
+                return validTypes.includes(file.type);
+            });
+
+            console.log('✅ Valid files found:', validFiles.length);
+
+            if (validFiles.length === 0) {
+                console.log('❌ No valid files found');
+                showAlert('Please select valid image files! 📸', 'error');
+                return;
+            }
+
+            console.log('🚀 Starting upload process...');
+            
+            // Show progress
+            showUploadProgress(validFiles);
+
+            // Create FormData
+            const formData = new FormData();
+            validFiles.forEach(file => {
+                formData.append('files[]', file);
+            });
+
+            // Upload files
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showUploadResults(data);
+                    // Start checking processing status
+                    checkProcessingStatus();
+                } else {
+                    showAlert(data.message || 'Upload failed! 😢', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Upload error:', error);
+                showAlert('Upload failed! Please try again. 😢', 'error');
+            });
+        }
+
+        // 📊 Show Upload Progress
+        function showUploadProgress(files) {
+            uploadProgress.style.display = 'block';
+            const container = document.getElementById('progressContainer');
+            
+            container.innerHTML = `
+                <div style="text-align: center; padding: 2rem;">
+                    <div class="spinner" style="width: 40px; height: 40px; margin: 0 auto 1rem;"></div>
+                    <h3>🚀 Uploading ${files.length} file(s)...</h3>
+                    <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                        Our AI is getting ready to work its magic! ✨
+                    </p>
+                </div>
+            `;
+            
+            // Scroll to progress
+            uploadProgress.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // ✅ Show Upload Results
+        function showUploadResults(data) {
+            uploadProgress.style.display = 'none';
+            uploadResults.style.display = 'block';
+            
+            const container = document.getElementById('resultsContainer');
+            
+            let resultsHTML = `
+                <div class="alert alert-success">
+                    🎉 Successfully uploaded ${data.files.length} file(s)! 
+                    Our AI is now analyzing them in the background.
+                </div>
+                <div style="margin-top: 1rem;">
+            `;
+            
+            data.files.forEach(file => {
+                resultsHTML += `
+                    <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: 600;">${file.original_name}</div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);">${file.message}</div>
+                        </div>
+                        <div style="color: var(--success-color); font-size: 1.2rem;">✅</div>
+                    </div>
+                `;
+            });
+            
+            resultsHTML += '</div>';
+            container.innerHTML = resultsHTML;
+            
+            // Add celebration animation
+            uploadResults.classList.add('celebrate');
+            setTimeout(() => uploadResults.classList.remove('celebrate'), 800);
+            
+            // Scroll to results
+            uploadResults.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 🔄 Check Processing Status
+        function checkProcessingStatus() {
+            const statusInterval = setInterval(() => {
+                fetch('/api/processing-status')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.currently_processing === 0) {
+                            clearInterval(statusInterval);
+                            // Update results to show completion
+                            const alert = document.querySelector('.alert-success');
+                            if (alert) {
+                                alert.innerHTML = `
+                                    🎊 All done! Your photos have been analyzed and are ready to explore! 
+                                    <br><small style="opacity: 0.8;">✨ AI tagging, face detection, and text extraction complete!</small>
+                                `;
+                                alert.classList.add('celebrate');
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.log('Status check failed (that is okay!):', error);
+                        clearInterval(statusInterval);
+                    });
+            }, 2000);
+        }
+
+        // 🔄 Reset Upload
+        function resetUpload() {
+            uploadProgress.style.display = 'none';
+            uploadResults.style.display = 'none';
+            fileInput.value = '';
+            resetUploadZone();
+            
+            // Scroll back to upload zone
+            uploadZone.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 🚨 Show Alert
+        function showAlert(message, type) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.innerHTML = message;
+            
+            // Insert at top of main container
+            const main = document.querySelector('main');
+            main.insertBefore(alertDiv, main.firstChild);
+            
+            // Remove after 5 seconds
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        }
+
+        // 🎊 Page Load Animation
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📤 Upload page loaded successfully!');
+            console.log('🎯 Upload JavaScript initialized');
+            
+            const cards = document.querySelectorAll('.card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.5s ease';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 100);
+            });
+        });
+
+        // 🌈 Console Easter Egg
+        console.log('📤 Upload page loaded! Time to organize some photos! 📸');
+        console.log('🎭 Pro tip: Our AI once thought a curry photo contained 2 people. We have fixed that! 😅');
+    </script>
+</body>
+</html>

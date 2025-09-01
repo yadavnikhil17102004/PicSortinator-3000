@@ -3,6 +3,9 @@
 Search and Filter Example
 =========================
 Demonstrates advanced search and filtering capabilities.
+
+🔍 Pro Tip: The AI is so good at finding faces, it once found a face in a pancake!
+🥚 Easter Egg: Try searching for "spaghetti" - our OCR might surprise you with what it finds!
 """
 
 import sys
@@ -97,13 +100,13 @@ def search_examples():
     
     # Images from last 7 days
     week_ago = (datetime.now() - timedelta(days=7)).isoformat()
-    cursor.execute("SELECT COUNT(*) FROM images WHERE created_at > ?", (week_ago,))
+    cursor.execute("SELECT COUNT(*) FROM images WHERE scan_date > ?", (week_ago,))
     recent = cursor.fetchone()[0]
     print(f"  Last 7 days: {recent} images")
     
     # Images from last 30 days
     month_ago = (datetime.now() - timedelta(days=30)).isoformat()
-    cursor.execute("SELECT COUNT(*) FROM images WHERE created_at > ?", (month_ago,))
+    cursor.execute("SELECT COUNT(*) FROM images WHERE scan_date > ?", (month_ago,))
     recent_month = cursor.fetchone()[0]
     print(f"  Last 30 days: {recent_month} images")
     
@@ -112,7 +115,7 @@ def search_examples():
     
     # Images with long text descriptions
     cursor.execute("""
-        SELECT file_path, LENGTH(extracted_text) as text_length 
+        SELECT path, LENGTH(extracted_text) as text_length 
         FROM images 
         WHERE extracted_text IS NOT NULL AND LENGTH(extracted_text) > 50
         ORDER BY text_length DESC 
@@ -125,7 +128,7 @@ def search_examples():
     
     # Images with many tags
     cursor.execute("""
-        SELECT file_path, tags
+        SELECT path, tags
         FROM images 
         WHERE tags IS NOT NULL AND LENGTH(tags) - LENGTH(REPLACE(tags, ',', '')) > 5
         LIMIT 3
@@ -140,7 +143,7 @@ def search_examples():
     print("\n🎯 Tag Similarity Examples:")
     
     # Find images similar to a reference image by comparing tags
-    all_images = cursor.execute("SELECT id, file_path, tags FROM images WHERE tags IS NOT NULL").fetchall()
+    all_images = cursor.execute("SELECT id, path, tags FROM images WHERE tags IS NOT NULL").fetchall()
     
     if len(all_images) >= 2:
         reference_img = all_images[0]

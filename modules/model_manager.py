@@ -13,7 +13,23 @@ import hashlib
 import logging
 from pathlib import Path
 from typing import Optional, Dict, Any
-import tensorflow as tf
+
+# Import TensorFlow with proper error handling
+try:
+    import tensorflow as tf
+    from keras import models, applications
+    TENSORFLOW_AVAILABLE = True
+    print("✅ TensorFlow and Keras imported successfully")
+    # 🥚 Easter Egg: TensorFlow is like a well-trained puppy - eager to help organize your photos!
+except ImportError as e:
+    print(f"⚠️ TensorFlow/Keras not available: {e}")
+    TENSORFLOW_AVAILABLE = False
+    # Create dummy classes to prevent import errors
+    class DummyModel:
+        pass
+    tf = None
+    models = None
+    applications = None
 
 logger = logging.getLogger(__name__)
 
@@ -375,13 +391,17 @@ class ModelManager:
             995: "earthstar", 996: "hen-of-the-woods", 997: "bolete", 998: "ear", 999: "toilet tissue"
         }
     
-    def load_mobilenet_model(self) -> tf.keras.Model:
+    def load_mobilenet_model(self):
         """
         Load MobileNetV2 model for image classification.
         
         Returns:
-            Loaded TensorFlow model
+            Loaded TensorFlow model or None if not available
         """
+        if not TENSORFLOW_AVAILABLE:
+            logger.warning("TensorFlow not available, cannot load MobileNetV2 model")
+            return None
+            
         if 'mobilenet_v2' in self._models:
             return self._models['mobilenet_v2']
         
@@ -391,11 +411,11 @@ class ModelManager:
             # Try to load cached model
             if model_path.exists():
                 logger.info(f"Loading cached MobileNetV2 from {model_path}")
-                model = tf.keras.models.load_model(model_path)
+                model = models.load_model(model_path)
             else:
                 # Download pre-trained model
                 logger.info("Loading MobileNetV2 from Keras applications")
-                model = tf.keras.applications.MobileNetV2(
+                model = applications.MobileNetV2(
                     input_shape=(224, 224, 3),
                     alpha=1.0,
                     include_top=True,
