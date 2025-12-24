@@ -44,13 +44,9 @@ class ImageLoader:
         image_files = []
         for file_path in directory.rglob('*'):
             if file_path.is_file() and file_path.suffix.lower() in self.SUPPORTED_FORMATS:
-                try:
-                    # Quick validation that it's actually an image
-                    with Image.open(file_path) as img:
-                        img.verify()
-                    image_files.append(file_path)
-                except Exception as e:
-                    logger.warning(f"Skipping invalid image {file_path}: {e}")
+                # We skip img.verify() here for performance.
+                # Validation happens during metadata extraction.
+                image_files.append(file_path)
                     
         return sorted(image_files)
     
@@ -118,7 +114,8 @@ class ImageLoader:
         try:
             hash_md5 = hashlib.md5()
             with open(image_path, "rb") as f:
-                for chunk in iter(lambda: f.read(4096), b""):
+                # Use 64KB chunks for better performance on large files
+                for chunk in iter(lambda: f.read(65536), b""):
                     hash_md5.update(chunk)
             return hash_md5.hexdigest()
         except Exception as e:
